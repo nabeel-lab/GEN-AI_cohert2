@@ -1,0 +1,77 @@
+# LaunchWise AI — Kubernetes Deployment manifests (GKE-ready, not required).
+# Cloud Run remains the primary deployment target for this hackathon build;
+# these manifests exist so the project can move to GKE later without any
+# application code changes — same container images as docker-compose.yml.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: launchwise-backend
+  labels:
+    app: launchwise-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: launchwise-backend
+  template:
+    metadata:
+      labels:
+        app: launchwise-backend
+    spec:
+      containers:
+        - name: backend
+          image: gcr.io/PROJECT_ID/launchwise-backend:latest
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: launchwise-secrets
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: launchwise-frontend
+  labels:
+    app: launchwise-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: launchwise-frontend
+  template:
+    metadata:
+      labels:
+        app: launchwise-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: gcr.io/PROJECT_ID/launchwise-frontend:latest
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"

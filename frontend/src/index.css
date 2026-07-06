@@ -88,3 +88,51 @@ body {
 .animate-pulse-gold {
   animation: pulse-gold 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* ── Shared motion design system ─────────────────────────────────────── */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-fade-in {
+  animation: fade-in 0.4s ease both;
+}
+
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.07) 37%, rgba(255,255,255,0.03) 63%);
+  background-size: 400px 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+/* Card lift utility — consistent hover depth across pages */
+.card-lift {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.card-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.5);
+}
+
+/* Consistent focus ring for accessibility across inputs/buttons */
+:focus-visible {
+  outline: 2px solid rgba(212, 175, 55, 0.5);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Stagger helper — pair with inline style `--stagger-i` if needed */
+.animate-fade-in-up[data-stagger] {
+  animation-delay: calc(var(--stagger-i, 0) * 60ms);
+}

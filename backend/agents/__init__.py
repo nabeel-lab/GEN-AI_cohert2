@@ -8,3 +8,5 @@ from agents.finance_agent import get_finance
 from agents.business_agent import analyze_business
 from agents.market_agent import run_market_analysis
 from agents.decision_agent import make_decision
+from agents.analytics_agent import analyze_uploaded_dataset
+from agents.insights_agent import get_historical_context

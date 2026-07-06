@@ -1,0 +1,11 @@
+apiVersion: v2
+name: launchwise
+description: >
+  Helm chart for LaunchWise AI — an AI-powered business decision intelligence
+  platform. Packages the same backend/frontend images used by k8s/*.yaml and
+  docker-compose.yml. Not required for the hackathon deployment (Cloud Run is
+  primary) — this exists so the project can move to a Helm-managed GKE
+  deployment later without re-authoring manifests.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

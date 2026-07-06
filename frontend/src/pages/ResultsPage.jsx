@@ -3,16 +3,18 @@ import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Download, RefreshCw, CheckCircle2, XCircle, AlertTriangle,
   TrendingUp, TrendingDown, Minus, MapPin, Users, Shield, BarChart3,
-  Truck, Megaphone, UserCheck, Brain, Star, AlertCircle,
+  Truck, Megaphone, UserCheck, Brain, Star, AlertCircle, Sparkles,
+  Target, Lightbulb, Flag, Compass, Gauge,
 } from 'lucide-react'
 import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts'
 
 // ── Tab definitions ──────────────────────────────────────────────────────────
 const TABS = [
   { id: 'overview',     label: 'Overview',     icon: Brain },
+  { id: 'ai-insights',  label: 'AI Insights',  icon: Sparkles },
   { id: 'market',       label: 'Market',        icon: TrendingUp },
   { id: 'competitors',  label: 'Competitors',   icon: Users },
   { id: 'finance',      label: 'Finance',       icon: BarChart3 },
@@ -23,6 +25,26 @@ const TABS = [
 ]
 
 // ── Small reusable primitives ────────────────────────────────────────────────
+
+// Animates a number counting up from 0 to its target value on mount/change.
+function useCountUp(target, duration = 900) {
+  const [value, setValue] = useState(0)
+  useEffect(() => {
+    let raf
+    const start = performance.now()
+    const from = 0
+    const tick = (now) => {
+      const pct = Math.min(1, (now - start) / duration)
+      const eased = 1 - Math.pow(1 - pct, 3) // ease-out-cubic
+      setValue(Math.round(from + (target - from) * eased))
+      if (pct < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [target, duration])
+  return value
+}
+
 function ScoreRing({ score, size = 120, strokeWidth = 10 }) {
   const r = (size - strokeWidth) / 2
   const circ = 2 * Math.PI * r
@@ -36,7 +58,7 @@ function ScoreRing({ score, size = 120, strokeWidth = 10 }) {
         stroke={color} strokeWidth={strokeWidth}
         strokeDasharray={`${dash} ${circ}`}
         strokeLinecap="round"
-        style={{ transition: 'stroke-dasharray 1.2s ease' }} />
+        style={{ transition: 'stroke-dasharray 1.2s cubic-bezier(0.16, 1, 0.3, 1)' }} />
     </svg>
   )
 }
@@ -108,10 +130,299 @@ function ChartTooltip({ active, payload, label }) {
   )
 }
 
+// Maps the backend's next_steps keys onto the phased-roadmap labels requested
+// for the demo — same underlying data, clearer executive framing.
+const ROADMAP_PHASE_LABELS = {
+  now:        'Immediate',
+  '3_months': 'Preparation',
+  '6_months': 'Launch',
+  '1_year':   'Growth',
+}
+
+// Fixed weights mirroring backend/agents/decision_agent.py::_SCORE_WEIGHTS —
+// shown here purely as a label; the actual sub-scores always come from the API.
+const SCORE_COMPONENT_META = {
+  market:       { label: 'Market Demand',    weight: 20 },
+  location:     { label: 'Location',         weight: 15 },
+  finance:      { label: 'Finance / ROI',    weight: 15 },
+  competition:  { label: 'Competition',      weight: 10 },
+  risk:         { label: 'Risk (inverse)',   weight: 15 },
+  customer_fit: { label: 'Customer Fit',     weight: 10 },
+  supply_chain: { label: 'Supply Chain',     weight: 7.5 },
+  marketing:    { label: 'Marketing',        weight: 7.5 },
+}
+
+function ScoreBreakdownCard({ breakdown }) {
+  if (!breakdown || Object.keys(breakdown).length === 0) return null
+  return (
+    <div className="glass rounded-2xl p-6">
+      <div className="flex items-center gap-2 mb-1">
+        <Gauge size={16} className="text-gold-400" />
+        <h3 className="font-semibold text-slate-100">Decision Score Breakdown</h3>
+      </div>
+      <p className="text-slate-500 text-xs mb-5">How each factor contributes to the overall Business Health Score.</p>
+      <div className="grid sm:grid-cols-2 gap-x-8 gap-y-4">
+        {Object.entries(breakdown).map(([key, value]) => {
+          const meta = SCORE_COMPONENT_META[key] || { label: key, weight: 0 }
+          return (
+            <div key={key}>
+              <div className="flex justify-between text-xs mb-1">
+                <span className="text-slate-400">{meta.label}</span>
+                <span className="text-slate-300 font-medium">{value}/100 <span className="text-slate-600">· {meta.weight}% weight</span></span>
+              </div>
+              <div className="h-1.5 bg-navy-700 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-700 ${value >= 70 ? 'bg-emerald-500' : value >= 45 ? 'bg-gold-gradient' : 'bg-red-500'}`}
+                  style={{ width: `${Math.min(100, value)}%` }}
+                />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── Executive Intelligence Brief — the hero section shown above every tab ───
+function ExecutiveBrief({ report }) {
+  const { decision } = report
+  const [expanded, setExpanded] = useState(true)
+  const score = decision.business_health_score
+  const animatedScore = useCountUp(score)
+
+  if (!decision.executive_summary) return null
+
+  return (
+    <div className="max-w-6xl mx-auto px-6 pt-6">
+      <div className="glass-gold rounded-2xl p-6 sm:p-7 animate-fade-in-up">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-9 h-9 rounded-xl bg-gold-500/15 flex items-center justify-center flex-shrink-0">
+            <Sparkles size={17} className="text-gold-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center flex-wrap gap-2">
+              <h2 className="text-lg font-bold text-slate-100">Executive Intelligence Brief</h2>
+              <Badge text={decision.go_no_go} />
+            </div>
+            <p className="text-slate-500 text-xs mt-0.5">AI-synthesized from all 10 agent reports</p>
+          </div>
+          <button
+            onClick={() => setExpanded((e) => !e)}
+            className="text-xs text-slate-400 hover:text-slate-100 px-3 py-1.5 rounded-lg border border-white/10 hover:border-white/20 transition-all flex-shrink-0"
+          >
+            {expanded ? 'Collapse' : 'Expand'}
+          </button>
+        </div>
+
+        {/* Score + verdict strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
+          <div className="flex items-center gap-3">
+            <div className="relative flex-shrink-0" style={{ width: 56, height: 56 }}>
+              <ScoreRing score={score} size={56} strokeWidth={6} />
+              <div className="absolute inset-0 flex items-center justify-center text-sm font-black text-slate-100 tabular-nums">{animatedScore}</div>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500">Health Score</p>
+              <p className="text-sm font-semibold text-slate-200">{score}/100</p>
+            </div>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500 mb-1">Confidence</p>
+            <p className="text-lg font-bold text-gold-400">{decision.confidence_score}%</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500 mb-1">Launch Window</p>
+            <p className="text-xs text-slate-300 leading-snug">{decision.recommended_launch_window || '—'}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500 mb-1">Expected ROI</p>
+            <p className="text-xs text-slate-300 leading-snug">{decision.expected_roi_summary || '—'}</p>
+          </div>
+        </div>
+
+        {/* Executive summary paragraph */}
+        <p className="text-slate-300 text-sm leading-relaxed mb-5">{decision.executive_summary}</p>
+
+        {expanded && (
+          <div className="grid sm:grid-cols-2 gap-5 animate-fade-in-up">
+            <div>
+              <p className="text-emerald-400 text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <Target size={12} /> Top Opportunities
+              </p>
+              <ul className="flex flex-col gap-1.5">
+                {decision.top_opportunities.map((o, i) => (
+                  <li key={i} className="text-xs text-slate-400 flex gap-2"><span className="text-emerald-600 flex-shrink-0">+</span>{o}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <p className="text-red-400 text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <AlertTriangle size={12} /> Biggest Risks
+              </p>
+              <ul className="flex flex-col gap-1.5">
+                {decision.biggest_risks.map((r, i) => (
+                  <li key={i} className="text-xs text-slate-400 flex gap-2"><span className="text-red-600 flex-shrink-0">−</span>{r}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <p className="text-blue-400 text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <Compass size={12} /> Market Outlook
+              </p>
+              <p className="text-xs text-slate-400 leading-relaxed">{decision.market_outlook}</p>
+            </div>
+            <div>
+              <p className="text-gold-400 text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <BarChart3 size={12} /> Financial Outlook
+              </p>
+              <p className="text-xs text-slate-400 leading-relaxed">{decision.financial_outlook}</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Tab: AI Insights ─────────────────────────────────────────────────────────
+function AIInsightsTab({ report }) {
+  const { decision } = report
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Why this verdict */}
+      <div className="glass-gold rounded-2xl p-6">
+        <h3 className="font-semibold mb-2 text-gold-400 flex items-center gap-2">
+          <Sparkles size={15} /> Why This Recommendation
+        </h3>
+        <p className="text-slate-300 text-sm leading-relaxed">{decision.reasoning}</p>
+      </div>
+
+      {/* Confidence explanation */}
+      <div className="glass rounded-2xl p-6">
+        <h3 className="font-semibold mb-1 text-slate-100">Confidence Explanation</h3>
+        <p className="text-slate-500 text-xs mb-4">Why the model is {decision.confidence_score}% confident in this verdict.</p>
+        <div className="flex flex-col gap-2.5">
+          {decision.confidence_factors.map((f, i) => (
+            <div key={i} className="flex gap-3 items-start text-sm">
+              <CheckCircle2 size={14} className="text-gold-400 flex-shrink-0 mt-0.5" />
+              <p className="text-slate-300 leading-relaxed">{f}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Risk vs Opportunity matrix */}
+      <div className="glass rounded-2xl p-6">
+        <h3 className="font-semibold mb-4 text-slate-100">Risk vs Opportunity Matrix</h3>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div className="rounded-xl p-4 bg-emerald-500/8 border border-emerald-500/15">
+            <p className="text-emerald-400 text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <Target size={12} /> Opportunities
+            </p>
+            <ul className="flex flex-col gap-2">
+              {decision.top_opportunities.map((o, i) => (
+                <li key={i} className="text-sm text-slate-300 flex gap-2"><span className="text-emerald-500 flex-shrink-0">+</span>{o}</li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-xl p-4 bg-red-500/8 border border-red-500/15">
+            <p className="text-red-400 text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <AlertTriangle size={12} /> Risks
+            </p>
+            <ul className="flex flex-col gap-2">
+              {decision.biggest_risks.map((r, i) => (
+                <li key={i} className="text-sm text-slate-300 flex gap-2"><span className="text-red-500 flex-shrink-0">−</span>{r}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      {/* Strengths / Weaknesses */}
+      <div className="grid sm:grid-cols-2 gap-6">
+        <div className="glass rounded-2xl p-6">
+          <h3 className="font-semibold mb-3 text-slate-100 flex items-center gap-2">
+            <Star size={14} className="text-emerald-400" /> Key Strengths
+          </h3>
+          <ul className="flex flex-col gap-2">
+            {decision.key_strengths.map((s, i) => (
+              <li key={i} className="text-sm text-slate-300 flex gap-2"><span className="text-emerald-600 flex-shrink-0">•</span>{s}</li>
+            ))}
+          </ul>
+        </div>
+        <div className="glass rounded-2xl p-6">
+          <h3 className="font-semibold mb-3 text-slate-100 flex items-center gap-2">
+            <AlertCircle size={14} className="text-red-400" /> Key Weaknesses
+          </h3>
+          <ul className="flex flex-col gap-2">
+            {decision.key_weaknesses.map((w, i) => (
+              <li key={i} className="text-sm text-slate-300 flex gap-2"><span className="text-red-600 flex-shrink-0">•</span>{w}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      {/* Hidden opportunities + critical risks */}
+      <div className="grid sm:grid-cols-2 gap-6">
+        <div className="glass-gold rounded-2xl p-6">
+          <h3 className="font-semibold mb-3 text-gold-400 flex items-center gap-2">
+            <Lightbulb size={14} /> Hidden Opportunities
+          </h3>
+          <ul className="flex flex-col gap-2">
+            {decision.hidden_opportunities.map((h, i) => (
+              <li key={i} className="text-sm text-slate-300 flex gap-2"><span className="text-gold-500 flex-shrink-0">✦</span>{h}</li>
+            ))}
+          </ul>
+        </div>
+        <div className="glass rounded-2xl p-6 border border-red-500/15">
+          <h3 className="font-semibold mb-3 text-red-400 flex items-center gap-2">
+            <AlertTriangle size={14} /> Critical Risks
+          </h3>
+          <ul className="flex flex-col gap-2">
+            {decision.critical_risks.map((c, i) => (
+              <li key={i} className="text-sm text-slate-300 flex gap-2"><span className="text-red-500 flex-shrink-0">!</span>{c}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      {/* Patterns & anomalies */}
+      {decision.patterns.length > 0 && (
+        <div className="glass rounded-2xl p-6">
+          <h3 className="font-semibold mb-4 text-slate-100 flex items-center gap-2">
+            <Compass size={15} className="text-gold-400" /> Patterns & Anomalies Detected
+          </h3>
+          <div className="flex flex-col gap-3">
+            {decision.patterns.map((p, i) => (
+              <div key={i} className="flex gap-3 items-start p-3 rounded-xl bg-navy-800/50 text-sm">
+                <Sparkles size={13} className="text-gold-400 flex-shrink-0 mt-0.5" />
+                <p className="text-slate-300 leading-relaxed">{p}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Next milestone */}
+      <div className="glass rounded-2xl p-6 flex items-start gap-4">
+        <div className="w-9 h-9 rounded-xl bg-gold-500/10 flex items-center justify-center flex-shrink-0">
+          <Flag size={16} className="text-gold-400" />
+        </div>
+        <div>
+          <h3 className="font-semibold text-slate-100 mb-1">Suggested Next Milestone</h3>
+          <p className="text-slate-300 text-sm leading-relaxed">{decision.suggested_next_milestone}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Tab: Overview ────────────────────────────────────────────────────────────
 function OverviewTab({ report }) {
   const { decision, business_profile, market_intelligence, risk, finance } = report
   const score = decision.business_health_score
+  const animatedScore = useCountUp(score)
 
   return (
     <div className="flex flex-col gap-6">
@@ -121,7 +432,7 @@ function OverviewTab({ report }) {
           style={{ width: 120, height: 120 }}>
           <ScoreRing score={score} />
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-3xl font-black text-slate-100">{score}</span>
+            <span className="text-3xl font-black text-slate-100 tabular-nums">{animatedScore}</span>
             <span className="text-xs text-slate-500">/ 100</span>
           </div>
         </div>
@@ -146,13 +457,16 @@ function OverviewTab({ report }) {
           { label: 'Year-1 Revenue',   value: `₹${(finance.projected_revenue_month_12/100000).toFixed(1)}L`, sub: 'projected' },
           { label: 'ROI (12 mo)',      value: `${finance.roi_percentage}%`,               sub: 'projected' },
         ].map((m) => (
-          <div key={m.label} className="glass rounded-xl p-4 text-center">
+          <div key={m.label} className="glass card-lift rounded-xl p-4 text-center">
             <p className="text-slate-500 text-xs mb-1">{m.label}</p>
             <p className="text-xl font-bold text-slate-100">{m.value}</p>
             <p className="text-xs text-slate-600 mt-0.5 capitalize">{m.sub}</p>
           </div>
         ))}
       </div>
+
+      {/* Decision score breakdown — shows how the health score was formed */}
+      <ScoreBreakdownCard breakdown={decision.score_breakdown} />
 
       {/* Top 3 recommendations */}
       <div className="glass rounded-2xl p-6">
@@ -202,10 +516,11 @@ function OverviewTab({ report }) {
       <div className="glass rounded-2xl p-6">
         <h3 className="font-semibold mb-5 text-slate-100">Action Roadmap</h3>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {Object.entries(decision.next_steps).map(([phase, actions]) => (
+          {Object.entries(decision.next_steps).map(([phase, actions], i) => (
             <div key={phase} className="bg-navy-800/60 rounded-xl p-4">
+              <p className="text-slate-600 text-xs font-mono mb-1">PHASE {i + 1}</p>
               <p className="text-gold-400 text-xs font-bold uppercase tracking-wider mb-3">
-                {phase.replace('_', ' ')}
+                {ROADMAP_PHASE_LABELS[phase] || phase.replace('_', ' ')}
               </p>
               <ul className="flex flex-col gap-2">
                 {actions.map((a, i) => (
@@ -280,7 +595,7 @@ function CompetitorsTab({ report }) {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-4">
         {competitors.competitors.map((c) => (
-          <div key={c.name} className="glass rounded-2xl p-6">
+          <div key={c.name} className="glass card-lift rounded-2xl p-6">
             <div className="flex items-start justify-between gap-4 mb-4">
               <div>
                 <h3 className="font-semibold text-slate-100">{c.name}</h3>
@@ -405,12 +720,11 @@ function FinanceTab({ report }) {
             <YAxis tick={{ fill: '#64748b', fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${(v/1000).toFixed(0)}K`} />
             <Tooltip content={<ChartTooltip />} />
             <ReferenceLine y={0} stroke="rgba(255,255,255,0.15)" />
-            <Bar dataKey="Profit" radius={[4, 4, 0, 0]}
-              fill="#10b981"
-              label={false}
-              // Color bars individually: green if profit ≥ 0, red if negative
-              /* recharts v3 supports Cell for per-bar color */
-            />
+            <Bar dataKey="Profit" radius={[4, 4, 0, 0]}>
+              {chartData.map((row) => (
+                <Cell key={row.month} fill={row.Profit >= 0 ? '#10b981' : '#ef4444'} />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -505,7 +819,7 @@ function PersonasTab({ report }) {
   return (
     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
       {report.personas.map((p) => (
-        <div key={p.name} className="glass rounded-2xl p-6 flex flex-col gap-4">
+        <div key={p.name} className="glass card-lift rounded-2xl p-6 flex flex-col gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-gold-500/15 flex items-center justify-center text-gold-400 font-bold text-sm flex-shrink-0">
               {p.name.split(' ').map((w) => w[0]).join('').slice(0, 2)}
@@ -547,13 +861,14 @@ function PersonasTab({ report }) {
 // ── Tab: Risk ────────────────────────────────────────────────────────────────
 function RiskTab({ report }) {
   const { risk, supply_chain, marketing } = report
+  const animatedRisk = useCountUp(risk.risk_score)
   return (
     <div className="flex flex-col gap-6">
       <div className="glass rounded-2xl p-6 flex flex-col sm:flex-row items-center gap-6">
         <div className="relative flex-shrink-0" style={{ width: 100, height: 100 }}>
           <ScoreRing score={risk.risk_score} size={100} strokeWidth={9} />
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-2xl font-black text-slate-100">{risk.risk_score}</span>
+            <span className="text-2xl font-black text-slate-100 tabular-nums">{animatedRisk}</span>
             <span className="text-xs text-slate-500">/ 100</span>
           </div>
         </div>
@@ -699,7 +1014,7 @@ export default function ResultsPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-navy-gradient flex items-center justify-center px-6">
-        <div className="glass rounded-2xl p-10 text-center max-w-md">
+        <div className="glass rounded-2xl p-10 text-center max-w-md animate-fade-in-up">
           <AlertCircle size={40} className="text-gold-400 mx-auto mb-4" />
           <h2 className="text-xl font-bold mb-2">No Report Available</h2>
           <p className="text-slate-400 text-sm mb-6">{error}</p>
@@ -721,16 +1036,20 @@ export default function ResultsPage() {
     )
   }
 
+  // Only the active tab's component is constructed/mounted — avoids mounting
+  // two Recharts containers + a Maps iframe simultaneously on every render.
   const TAB_COMPONENTS = {
-    overview:    <OverviewTab    report={report} />,
-    market:      <MarketTab      report={report} />,
-    competitors: <CompetitorsTab report={report} />,
-    finance:     <FinanceTab     report={report} />,
-    location:    <LocationTab    report={report} />,
-    personas:    <PersonasTab    report={report} />,
-    risk:        <RiskTab        report={report} />,
-    report:      <ReportTab      report={report} />,
+    overview:    OverviewTab,
+    'ai-insights': AIInsightsTab,
+    market:      MarketTab,
+    competitors: CompetitorsTab,
+    finance:     FinanceTab,
+    location:    LocationTab,
+    personas:    PersonasTab,
+    risk:        RiskTab,
+    report:      ReportTab,
   }
+  const ActiveTabComponent = TAB_COMPONENTS[activeTab]
 
   return (
     <div className="min-h-screen bg-navy-gradient text-slate-100">
@@ -769,6 +1088,9 @@ export default function ResultsPage() {
         </div>
       </div>
 
+      {/* ── Executive Intelligence Brief (hero) ── */}
+      <ExecutiveBrief report={report} />
+
       {/* ── Tab bar ── */}
       <div className="border-b border-white/5 sticky top-16 z-40 bg-navy-900/95 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 overflow-x-auto">
@@ -794,7 +1116,9 @@ export default function ResultsPage() {
 
       {/* ── Tab content ── */}
       <div className="max-w-6xl mx-auto px-6 py-8">
-        {TAB_COMPONENTS[activeTab]}
+        <div key={activeTab} className="animate-fade-in-up">
+          <ActiveTabComponent report={report} />
+        </div>
       </div>
     </div>
   )

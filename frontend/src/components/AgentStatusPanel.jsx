@@ -108,71 +108,94 @@ export default function AgentStatusPanel({ isRunning, onComplete }) {
       </div>
 
       {/* Agent list */}
-      <div className="flex flex-col gap-2 flex-1 overflow-y-auto pr-1">
-        {AGENTS.map((agent) => {
+      <div className="flex flex-col flex-1 overflow-y-auto pr-1">
+        {AGENTS.map((agent, idx) => {
           const status = statuses[agent.id]
           const isActive = activeId === agent.id
+          const isLast = idx === AGENTS.length - 1
 
           return (
-            <div
-              key={agent.id}
-              className={[
-                'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-300',
-                status === 'complete' ? 'bg-emerald-500/8 border border-emerald-500/15' :
-                isActive             ? 'bg-gold-500/8 border border-gold-500/20 animate-pulse-gold' :
-                                       'border border-transparent opacity-50',
-              ].join(' ')}
-            >
-              {/* Status icon */}
-              <div className={[
-                'w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-300',
-                status === 'complete' ? 'bg-emerald-500/15' :
-                isActive             ? 'bg-gold-500/15' :
-                                       'bg-navy-700',
-              ].join(' ')}>
-                {status === 'complete' ? (
-                  <CheckCircle2 size={14} className="text-emerald-400" />
-                ) : isActive ? (
-                  <Loader2 size={14} className="text-gold-400 animate-spin" />
-                ) : (
-                  <Clock size={14} className="text-slate-600" />
-                )}
-              </div>
-
-              {/* Agent icon + label */}
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <agent.icon
-                  size={13}
+            <div key={agent.id} className="relative flex gap-3">
+              {/* Timeline connector */}
+              {!isLast && (
+                <div
                   className={[
-                    'flex-shrink-0 transition-colors duration-300',
-                    status === 'complete' ? 'text-emerald-400' :
-                    isActive             ? 'text-gold-400' :
-                                           'text-slate-600',
+                    'absolute left-[17px] top-8 w-px h-[calc(100%-8px)] transition-colors duration-500',
+                    status === 'complete' ? 'bg-emerald-500/30' : 'bg-white/5',
                   ].join(' ')}
                 />
-                <div className="min-w-0">
-                  <p className={[
-                    'text-xs font-medium truncate transition-colors duration-300',
-                    status === 'complete' ? 'text-emerald-300' :
-                    isActive             ? 'text-gold-400' :
-                                           'text-slate-500',
-                  ].join(' ')}>
-                    {agent.label}
-                  </p>
-                  {isActive && (
-                    <p className="text-xs text-slate-500 truncate">{agent.desc}</p>
+              )}
+
+              <div
+                className={[
+                  'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-300 flex-1 min-w-0 mb-1',
+                  status === 'complete' ? 'bg-emerald-500/8 border border-emerald-500/15' :
+                  isActive             ? 'bg-gold-500/8 border border-gold-500/20 animate-pulse-gold shadow-lg shadow-gold-500/5' :
+                                         'border border-transparent opacity-50',
+                ].join(' ')}
+              >
+                {/* Status icon */}
+                <div className={[
+                  'relative w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-300',
+                  status === 'complete' ? 'bg-emerald-500/15' :
+                  isActive             ? 'bg-gold-500/15' :
+                                         'bg-navy-700',
+                ].join(' ')}>
+                  {status === 'complete' ? (
+                    <CheckCircle2 size={14} className="text-emerald-400 animate-fade-in" />
+                  ) : isActive ? (
+                    <>
+                      <Loader2 size={14} className="text-gold-400 animate-spin" />
+                      <span className="absolute inset-0 rounded-lg bg-gold-500/20 animate-ping" />
+                    </>
+                  ) : (
+                    <Clock size={14} className="text-slate-600" />
                   )}
                 </div>
-              </div>
 
-              {/* Agent number badge */}
-              <span className="text-xs text-slate-700 font-mono flex-shrink-0">
-                {String(agent.id).padStart(2, '0')}
-              </span>
+                {/* Agent icon + label */}
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <agent.icon
+                    size={13}
+                    className={[
+                      'flex-shrink-0 transition-colors duration-300',
+                      status === 'complete' ? 'text-emerald-400' :
+                      isActive             ? 'text-gold-400' :
+                                             'text-slate-600',
+                    ].join(' ')}
+                  />
+                  <div className="min-w-0">
+                    <p className={[
+                      'text-xs font-medium truncate transition-colors duration-300',
+                      status === 'complete' ? 'text-emerald-300' :
+                      isActive             ? 'text-gold-400' :
+                                             'text-slate-500',
+                    ].join(' ')}>
+                      {agent.label}
+                    </p>
+                    {isActive && (
+                      <p className="text-xs text-slate-500 truncate">{agent.desc}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Agent number badge */}
+                <span className="text-xs text-slate-700 font-mono flex-shrink-0">
+                  {String(agent.id).padStart(2, '0')}
+                </span>
+              </div>
             </div>
           )
         })}
       </div>
+
+      {/* Completion banner */}
+      {isRunning && completedCount === AGENTS.length && (
+        <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 animate-fade-in-up">
+          <CheckCircle2 size={15} className="text-emerald-400 flex-shrink-0" />
+          <p className="text-xs text-emerald-300 font-medium">All agents complete — assembling your report…</p>
+        </div>
+      )}
     </div>
   )
 }

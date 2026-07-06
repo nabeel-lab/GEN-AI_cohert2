@@ -68,27 +68,28 @@ export default function LandingPage() {
 
       {/* ── Hero ── */}
       <section className="pt-36 pb-24 px-6 text-center relative">
-        {/* Glow orb */}
+        {/* Layered glow orbs for depth */}
         <div className="absolute top-24 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-gold-500/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-40 left-1/3 -translate-x-1/2 w-[300px] h-[200px] bg-accent-teal/5 rounded-full blur-3xl pointer-events-none animate-float" />
 
         <div className="relative max-w-4xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-gold text-gold-400 text-sm font-medium mb-8">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-gold text-gold-400 text-sm font-medium mb-8 animate-fade-in-up">
             <span className="w-2 h-2 rounded-full bg-gold-500 animate-pulse-gold" />
             Powered by Gemini 1.5 Flash · 10 AI Agents
           </div>
 
-          <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold leading-tight mb-6 tracking-tight">
+          <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold leading-tight mb-6 tracking-tight animate-fade-in-up" style={{ animationDelay: '80ms' }}>
             Know before you{' '}
             <span className="text-gold-gradient">launch.</span>
           </h1>
 
-          <p className="text-lg sm:text-xl text-slate-400 max-w-2xl mx-auto mb-10 leading-relaxed">
+          <p className="text-lg sm:text-xl text-slate-400 max-w-2xl mx-auto mb-10 leading-relaxed animate-fade-in-up" style={{ animationDelay: '160ms' }}>
             LaunchWise AI runs 10 specialized agents on your business idea — analyzing
             market demand, competitors, location, finances, and risk — then delivers a
             Go&nbsp;/&nbsp;No-Go verdict in under 60 seconds.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up" style={{ animationDelay: '240ms' }}>
             <button
               onClick={() => navigate('/analyze')}
               className="group flex items-center gap-3 px-8 py-4 rounded-xl bg-gold-gradient text-navy-900 font-bold text-base transition-all duration-200 hover:shadow-2xl hover:shadow-gold-500/30 hover:scale-105 active:scale-100"
@@ -130,8 +131,12 @@ export default function LandingPage() {
           </div>
 
           <div className="grid sm:grid-cols-2 gap-6">
-            {FEATURES.map((f) => (
-              <div key={f.title} className="glass rounded-2xl p-7 hover:border-gold-500/20 transition-colors duration-300 group">
+            {FEATURES.map((f, i) => (
+              <div
+                key={f.title}
+                className="glass card-lift rounded-2xl p-7 hover:border-gold-500/20 transition-colors duration-300 group animate-fade-in-up"
+                style={{ animationDelay: `${i * 70}ms` }}
+              >
                 <div className="w-11 h-11 rounded-xl bg-gold-500/10 flex items-center justify-center mb-5 group-hover:bg-gold-500/15 transition-colors">
                   <f.icon size={20} className="text-gold-400" />
                 </div>
@@ -158,7 +163,7 @@ export default function LandingPage() {
                 {i < STEPS.length - 1 && (
                   <div className="hidden lg:block absolute top-7 left-full w-full h-px bg-gradient-to-r from-gold-500/30 to-transparent z-10" />
                 )}
-                <div className="glass rounded-2xl p-6">
+                <div className="glass card-lift rounded-2xl p-6 animate-fade-in-up" style={{ animationDelay: `${i * 90}ms` }}>
                   <div className="text-3xl font-black text-gold-500/20 mb-3">{s.step}</div>
                   <h3 className="font-semibold mb-2 text-slate-100">{s.label}</h3>
                   <p className="text-slate-400 text-sm leading-relaxed">{s.desc}</p>

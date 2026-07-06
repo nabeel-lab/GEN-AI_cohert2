@@ -1,9 +1,11 @@
 import os
 import uuid
 import json
-from datetime import datetime
-from fastapi import FastAPI, HTTPException
+import logging
+from datetime import datetime, timezone
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import ValidationError
 from typing import List, Dict, Optional
 from dotenv import load_dotenv
@@ -12,9 +14,13 @@ from dotenv import load_dotenv
 _root_env = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env')
 load_dotenv(dotenv_path=_root_env, override=False)
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
+logger = logging.getLogger("launchwise.main")
+
 # Import schemas and agents
-from models import AnalysisRequest, FinalReport
+from models import AnalysisRequest, FinalReport, DatasetKPIReport
 import agents
+import services
 
 app = FastAPI(title="LaunchWise AI - Master Decision Intelligence Server")
 
@@ -43,6 +49,11 @@ print(f"[Config] Maps Key    : {'set' if MAPS_API_KEY else 'not configured'}")
 SESSIONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sessions")
 os.makedirs(SESSIONS_DIR, exist_ok=True)
 
+# Temporary holding area for user-uploaded datasets (CSV/Excel) before the
+# Analytics Agent processes them. Not served publicly — only read by the agent.
+UPLOADS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
+os.makedirs(UPLOADS_DIR, exist_ok=True)
+
 # ── Firestore (optional) ─────────────────────────────────────────────────────
 # Uses Google Cloud Firestore — NOT a local DB.
 # Activated only when GOOGLE_CLOUD_PROJECT is set and credentials are available.
@@ -64,7 +75,7 @@ except Exception as e:
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+    return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 @app.post("/analyze", response_model=FinalReport)
 def run_orchestration(request: AnalysisRequest):
@@ -98,17 +109,25 @@ def run_orchestration(request: AnalysisRequest):
         
         # 9. Risk Prediction (Rule-based agent)
         risk_intel = agents.evaluate_risk(request.business_type, request.budget, location_intel.competition_density)
-        
+
+        # 9.5. Insights Agent (optional — reads BigQuery history for this business_type)
+        # Returns None on first-ever analysis of a type, or if BigQuery is unavailable;
+        # the Decision Agent handles a None historical_context exactly as before.
+        historical_context = agents.get_historical_context(request.business_type)
+
         # 10. Decision Agent (Live — Gemini synthesizer with rule-based fallback)
         decision_intel = agents.make_decision(
             biz_profile, market_intel, competitor_intel,
-            location_intel, finance_intel, risk_intel
+            location_intel, finance_intel, risk_intel,
+            personas=personas, supply_chain=supply_chain, marketing=marketing,
+            budget=request.budget, location_name=request.location,
+            historical_context=historical_context,
         )
         
         # Assemble Final Report
         report = FinalReport(
             session_id=session_id,
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             request=request,
             business_profile=biz_profile,
             market_intelligence=market_intel,
@@ -122,18 +141,35 @@ def run_orchestration(request: AnalysisRequest):
             decision=decision_intel
         )
         
-        # Save to Database Fallback (JSON file)
+        # --- PDF generation + Cloud Storage upload ---
+        # Best-effort: any failure here must not break the core analysis response.
+        report_dict = report.model_dump()
+        try:
+            pdf_bytes = services.generate_investor_pdf(report_dict)
+            report.pdf_url = services.upload_pdf(session_id, pdf_bytes)
+            report.json_url = services.upload_json(session_id, json.dumps(report_dict, indent=2).encode("utf-8"))
+            report_dict = report.model_dump()  # refresh with the URLs now set
+        except Exception as pe:
+            logger.error(f"PDF/Storage pipeline failed for session {session_id}: {pe}")
+
+        # Save to Database Fallback (JSON file) — includes pdf_url/json_url if set above
         save_path = os.path.join(SESSIONS_DIR, f"{session_id}.json")
         with open(save_path, "w") as f:
-            json.dump(report.model_dump(), f, indent=4)
-            
+            json.dump(report_dict, f, indent=4)
+
         # Optional: Save to Firestore if connected
         if firestore_db:
             try:
-                firestore_db.collection("reports").document(session_id).set(report.model_dump())
+                firestore_db.collection("reports").document(session_id).set(report_dict)
             except Exception as fe:
                 print(f"Failed to write to Firestore: {fe}")
-                
+
+        # --- BigQuery analytics row (best-effort — never blocks the response) ---
+        try:
+            services.insert_report(report_dict)
+        except Exception as be:
+            logger.error(f"BigQuery insert failed for session {session_id}: {be}")
+
         return report
 
     except Exception as e:
@@ -163,6 +199,88 @@ def get_session_report(session_id: str):
             raise HTTPException(status_code=500, detail=f"Firestore fetch failed: {str(fe)}")
             
     raise HTTPException(status_code=404, detail=f"Report session {session_id} not found.")
+
+
+@app.get("/report-file/{filename}")
+def get_local_report_file(filename: str):
+    """
+    Serves PDF/JSON report files from the local sessions/ fallback directory.
+    Only reached when Cloud Storage is unavailable — storage_service.upload_pdf/
+    upload_json return a "/api/report-file/..." URL in that case instead of a
+    real GCS public URL, and the frontend treats both identically.
+    """
+    # Reject path traversal — filename must be exactly "<uuid>.pdf" or "<uuid>.json"
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename.")
+
+    file_path = os.path.join(SESSIONS_DIR, filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Report file not found.")
+
+    media_type = "application/pdf" if filename.endswith(".pdf") else "application/json"
+    return FileResponse(file_path, media_type=media_type, filename=filename)
+
+
+@app.get("/download-report/{session_id}")
+def download_report(session_id: str):
+    """
+    Returns the PDF for a session — redirects to its Cloud Storage public URL
+    if one was generated, or regenerates it on the fly from the saved JSON
+    report as a last resort (e.g. for sessions created before this endpoint existed).
+    """
+    save_path = os.path.join(SESSIONS_DIR, f"{session_id}.json")
+    if not os.path.exists(save_path):
+        raise HTTPException(status_code=404, detail=f"Report session {session_id} not found.")
+
+    with open(save_path, "r") as f:
+        report_dict = json.load(f)
+
+    if report_dict.get("pdf_url"):
+        return RedirectResponse(url=report_dict["pdf_url"])
+
+    # No pdf_url stored (older session, or the original PDF pipeline failed) — generate now.
+    try:
+        pdf_bytes = services.generate_investor_pdf(report_dict)
+        pdf_url = services.upload_pdf(session_id, pdf_bytes)
+        report_dict["pdf_url"] = pdf_url
+        with open(save_path, "w") as f:
+            json.dump(report_dict, f, indent=4)
+        return RedirectResponse(url=pdf_url)
+    except Exception as e:
+        logger.error(f"On-demand PDF generation failed for {session_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {str(e)}")
+
+
+@app.post("/upload-data", response_model=DatasetKPIReport)
+async def upload_business_data(file: UploadFile = File(...)):
+    """
+    Accepts a CSV or Excel upload (sales report, inventory, financial
+    statement) and runs it through the Analytics Agent: clean -> summarize ->
+    compute KPIs -> sync to BigQuery. Uses gpu_processing (cuDF-if-available,
+    else pandas) under the hood.
+    """
+    allowed_ext = (".csv", ".xlsx", ".xls")
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in allowed_ext:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type '{ext}'. Allowed: {', '.join(allowed_ext)}")
+
+    upload_id = str(uuid.uuid4())
+    saved_path = os.path.join(UPLOADS_DIR, f"{upload_id}{ext}")
+    try:
+        contents = await file.read()
+        with open(saved_path, "wb") as f:
+            f.write(contents)
+
+        kpi_report = agents.analyze_uploaded_dataset(saved_path)
+        return DatasetKPIReport(**kpi_report)
+    except Exception as e:
+        logger.error(f"Dataset upload processing failed for {file.filename}: {e}")
+        raise HTTPException(status_code=500, detail=f"Dataset processing failed: {str(e)}")
+    finally:
+        # Uploaded file is only needed transiently for this request's analysis.
+        if os.path.exists(saved_path):
+            os.remove(saved_path)
+
 
 if __name__ == "__main__":
     import uvicorn

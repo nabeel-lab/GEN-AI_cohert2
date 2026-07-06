@@ -60,3 +60,4 @@ desktop.ini
 *.pdf
 backend/temp_reports/
 backend/sessions/
+backend/uploads/

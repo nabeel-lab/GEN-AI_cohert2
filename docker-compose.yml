@@ -1,0 +1,29 @@
+# LaunchWise AI — local multi-container stack.
+# Mirrors the Cloud Run deployment topology (frontend + backend as separate
+# services) for local integration testing. Not required for `npm run dev` /
+# `uvicorn --reload` local development — this is for testing the built,
+# containerized images before deploying to Cloud Run or GKE.
+
+services:
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./backend/sessions:/app/sessions
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "8080:8080"
+    depends_on:
+      - backend

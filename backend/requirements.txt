@@ -6,3 +6,17 @@ reportlab==4.2.2
 google-cloud-firestore==2.16.0
 python-dotenv==1.0.1
 requests==2.32.3
+python-multipart==0.0.9
+google-cloud-bigquery==3.25.0
+google-cloud-storage==2.18.2
+pandas==2.2.2
+openpyxl==3.1.5
+matplotlib==3.9.2
+
+# Optional GPU acceleration for gpu_processing.py — NOT required to run the
+# platform. Install only on a CUDA-capable machine matching your CUDA version;
+# see https://docs.rapids.ai/install for the correct index URL.
+# cudf-cu12
+
+# Optional distributed processing for spark_processing.py — NOT required.
+# pyspark==3.5.1

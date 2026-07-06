@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, ArrowRight, ChevronRight,
@@ -115,6 +115,7 @@ export default function AnalysisPage() {
   async function startAnalysis(data) {
     setPhase('analyzing')
     setApiError('')
+    setAnimDone(false)
 
     try {
       const payload = {
@@ -146,30 +147,40 @@ export default function AnalysisPage() {
     }
   }
 
-  // Called by AgentStatusPanel when all 10 agents animate complete
-  const handleAgentsComplete = useCallback(() => {
-    // If API already returned, navigate immediately
-    // Otherwise wait for 'done' phase (the useEffect below handles it)
-    if (phase === 'done') navigate('/results')
-  }, [phase, navigate])
-
-  // Watch for both animation done AND API done
-  useState(() => {}) // placeholder — we use a different pattern below
-
-  // Navigate when API resolves (phase flips to 'done') after panel animation
-  // We do this via a simple polling-free approach: AgentStatusPanel onComplete
-  // fires navigate if phase===done; if API is slower than animation, we navigate
-  // once API finishes via this effect.
   const [animDone, setAnimDone] = useState(false)
+  const [elapsedSec, setElapsedSec] = useState(0)
+  const analysisStartRef = useRef(null)
 
-  const handleAgentsCompleteReal = useCallback(() => {
+  // Live elapsed-time counter while agents are "running" — reinforces the
+  // real-time feel of the analysis for the demo. Keeps counting across the
+  // 'analyzing' → 'done' transition since that's still one continuous
+  // visual sequence from the user's perspective.
+  useEffect(() => {
+    if (phase !== 'analyzing' && phase !== 'done') {
+      analysisStartRef.current = null
+      setElapsedSec(0)
+      return
+    }
+    if (analysisStartRef.current === null) analysisStartRef.current = Date.now()
+    const id = setInterval(() => {
+      setElapsedSec(Math.floor((Date.now() - analysisStartRef.current) / 1000))
+    }, 1000)
+    return () => clearInterval(id)
+  }, [phase])
+
+  // Called by AgentStatusPanel once all 10 agents finish their visual sequence.
+  const handleAgentsComplete = useCallback(() => {
     setAnimDone(true)
-    if (sessionStorage.getItem('lw_report')) navigate('/results')
-  }, [navigate])
+  }, [])
 
-  // If API returns before animation ends, navigate once animation finishes
-  // (animDone gets set first in handleAgentsCompleteReal)
-  // If animation ends before API, we wait for apiError or report in sessionStorage
+  // Navigate to /results only once BOTH the agent animation has finished AND
+  // the API has actually returned a report — whichever finishes last wins.
+  // This fixes a stuck-screen bug: previously, if the animation finished
+  // before the API responded, nothing ever re-checked and the user was
+  // stranded on the analyzing screen indefinitely.
+  useEffect(() => {
+    if (phase === 'done' && animDone) navigate('/results')
+  }, [phase, animDone, navigate])
 
   return (
     <div className="min-h-screen bg-navy-gradient text-slate-100 flex flex-col">
@@ -209,7 +220,7 @@ export default function AnalysisPage() {
         <div className="flex-1 flex flex-col justify-center">
 
           {phase === 'form' && (
-            <div className="max-w-xl w-full">
+            <div key={currentStep} className="max-w-xl w-full animate-fade-in-up">
 
               {/* Step counter */}
               <div className="flex items-center gap-2 mb-8">
@@ -329,15 +340,23 @@ export default function AnalysisPage() {
             </div>
           )}
 
-          {/* Analyzing state — left side shows summary card */}
-          {phase === 'analyzing' && (
-            <div className="max-w-xl w-full">
+          {/* Analyzing state — left side shows summary card.
+              Stays visible through 'done' too: 'done' only means the API
+              resolved, not that the 10-agent visual sequence has finished. */}
+          {(phase === 'analyzing' || phase === 'done') && (
+            <div className="max-w-xl w-full animate-fade-in-up">
               <div className="glass-gold rounded-2xl p-8 mb-6">
                 <div className="flex items-center gap-3 mb-6">
-                  <span className="text-3xl">🚀</span>
-                  <div>
+                  <span className="text-3xl animate-float">🚀</span>
+                  <div className="flex-1">
                     <h2 className="text-xl font-bold">Analysis in progress</h2>
                     <p className="text-slate-400 text-sm">10 agents are working on your idea</p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <span className="font-mono text-gold-400 text-lg font-bold tabular-nums">
+                      {String(Math.floor(elapsedSec / 60)).padStart(2, '0')}:{String(elapsedSec % 60).padStart(2, '0')}
+                    </span>
+                    <p className="text-slate-600 text-xs">elapsed</p>
                   </div>
                 </div>
                 <div className="flex flex-col gap-3 text-sm">
@@ -369,8 +388,8 @@ export default function AnalysisPage() {
         {/* ── Right: Agent Status Panel ── */}
         <div className="lg:w-80 xl:w-96 flex-shrink-0">
           <AgentStatusPanel
-            isRunning={phase === 'analyzing'}
-            onComplete={handleAgentsCompleteReal}
+            isRunning={phase === 'analyzing' || phase === 'done'}
+            onComplete={handleAgentsComplete}
           />
         </div>
       </div>

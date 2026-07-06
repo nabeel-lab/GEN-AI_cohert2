@@ -1,0 +1,36 @@
+# Default values for the launchwise Helm chart. Override with `helm install
+# launchwise ./helm/launchwise -f my-values.yaml` or --set flags.
+
+projectId: PROJECT_ID
+
+backend:
+  image:
+    repository: gcr.io/PROJECT_ID/launchwise-backend
+    tag: latest
+  replicas: 2
+  port: 8000
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+frontend:
+  image:
+    repository: gcr.io/PROJECT_ID/launchwise-frontend
+    tag: latest
+  replicas: 2
+  port: 8080
+  service:
+    type: LoadBalancer
+
+# Populated into a Kubernetes Secret consumed via envFrom in the backend
+# deployment — mirrors the variables documented in the root .env.example.
+secrets:
+  GEMINI_API_KEY: ""
+  GOOGLE_CLOUD_PROJECT: ""
+  FIRESTORE_DATABASE: ""
+  STORAGE_BUCKET: ""
+  GOOGLE_MAPS_API_KEY: ""

@@ -1,0 +1,32 @@
+# LaunchWise AI — Kubernetes Service manifests, paired with k8s/deployment.yaml.
+# `launchwise-backend` (ClusterIP) is only reachable inside the cluster, at
+# the DNS name "backend" — matching frontend/nginx.conf's proxy_pass target.
+# `launchwise-frontend` (LoadBalancer) is the public entry point.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  labels:
+    app: launchwise-backend
+spec:
+  type: ClusterIP
+  selector:
+    app: launchwise-backend
+  ports:
+    - port: 8000
+      targetPort: 8000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: launchwise-frontend
+  labels:
+    app: launchwise-frontend
+spec:
+  type: LoadBalancer
+  selector:
+    app: launchwise-frontend
+  ports:
+    - port: 80
+      targetPort: 8080

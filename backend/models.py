@@ -90,6 +90,30 @@ class DecisionReport(BaseModel):
     top_3_recommendations: List[str]
     next_steps: Dict[str, List[str]] # "now", "3_months", "6_months", "1_year"
 
+    # --- Executive Intelligence Brief ---
+    executive_summary: str = ""
+    top_opportunities: List[str] = Field(default_factory=list)
+    biggest_risks: List[str] = Field(default_factory=list)
+    market_outlook: str = ""
+    financial_outlook: str = ""
+    recommended_launch_window: str = ""
+    expected_roi_summary: str = ""
+
+    # --- AI Insights Panel ---
+    reasoning: str = ""                      # Why this recommendation was made, citing specific data
+    confidence_factors: List[str] = Field(default_factory=list)
+    key_strengths: List[str] = Field(default_factory=list)
+    key_weaknesses: List[str] = Field(default_factory=list)
+    hidden_opportunities: List[str] = Field(default_factory=list)
+    critical_risks: List[str] = Field(default_factory=list)
+    suggested_next_milestone: str = ""
+
+    # --- Pattern Detection (computed deterministically from agent outputs) ---
+    patterns: List[str] = Field(default_factory=list)
+
+    # --- Decision Score Breakdown (computed deterministically — same weights used for business_health_score) ---
+    score_breakdown: Dict[str, int] = Field(default_factory=dict)
+
 # --- Output Report ---
 class FinalReport(BaseModel):
     session_id: str
@@ -105,3 +129,21 @@ class FinalReport(BaseModel):
     marketing: List[MarketingCampaign]
     risk: RiskReport
     decision: DecisionReport
+
+    # Populated after Cloud Storage upload — None until then, and always
+    # optional so existing saved session JSON files remain valid.
+    pdf_url: Optional[str] = None
+    json_url: Optional[str] = None
+
+
+# --- Uploaded Dataset Analysis (Analytics Agent) ---
+class DatasetKPIReport(BaseModel):
+    filename: str
+    row_count: int
+    column_count: int
+    columns: List[str]
+    missing_values: Dict[str, int]
+    numeric_summary: Dict[str, Dict[str, float]]
+    kpis: Dict[str, float]
+    gpu_accelerated: bool
+    bigquery_synced: bool
