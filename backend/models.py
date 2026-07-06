@@ -8,6 +8,20 @@ class AnalysisRequest(BaseModel):
     budget: float = Field(..., description="Budget in INR")
     description: str = Field(..., description="Detailed description of the business idea")
 
+    # --- Precise location (optional) ---
+    # Populated by the frontend's Uber-style map picker (Maps JavaScript API +
+    # Places API + Geocoding API). All optional so requests built without the
+    # picker (existing tests, demo scenarios, older clients) remain valid.
+    latitude: Optional[float] = Field(None, description="Exact latitude picked on the map")
+    longitude: Optional[float] = Field(None, description="Exact longitude picked on the map")
+    formatted_address: Optional[str] = Field(None, description="Full formatted address from Geocoding API")
+    place_id: Optional[str] = Field(None, description="Google Place ID of the selected location")
+    locality: Optional[str] = Field(None, description="Neighborhood / area")
+    city: Optional[str] = Field(None, description="City")
+    state: Optional[str] = Field(None, description="State / administrative area")
+    country: Optional[str] = Field(None, description="Country")
+    postal_code: Optional[str] = Field(None, description="Postal / PIN code")
+
 # --- Agent Reports ---
 class BusinessProfile(BaseModel):
     business_type: str

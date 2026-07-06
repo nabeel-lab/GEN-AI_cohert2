@@ -142,7 +142,14 @@ def run_orchestration(request: AnalysisRequest):
         competitor_intel = agents.analyze_competitors(request.business_type)
         
         # 4. Location Intelligence (Hardcoded agent)
-        location_intel = agents.analyze_location(request.location, request.business_type)
+        # Prefers exact map-picked coordinates (request.latitude/longitude,
+        # from the frontend's Uber-style LocationPicker) over the neighborhood
+        # centroid lookup when available — both fields are optional so
+        # requests without them behave exactly as before.
+        location_intel = agents.analyze_location(
+            request.location, request.business_type,
+            precise_lat=request.latitude, precise_lng=request.longitude,
+        )
         
         # 5. Economic Intelligence (Formula-based agent)
         finance_intel = agents.get_finance(request)
@@ -353,7 +360,13 @@ def simulate_scenario(sim: SimulationRequest):
     budget = sim.budget if sim.budget is not None else base["request"]["budget"]
 
     # Recompute location + finance + risk — all pure formula agents, no API calls.
-    location_intel = agents.analyze_location(location_str, business_type)
+    # Reuse the original session's exact map-picked coordinates only if the
+    # simulation didn't override the location string to somewhere else.
+    base_lat = base["location"].get("latitude") if not sim.location else None
+    base_lng = base["location"].get("longitude") if not sim.location else None
+    location_intel = agents.analyze_location(
+        location_str, business_type, precise_lat=base_lat, precise_lng=base_lng,
+    )
     if sim.competition_density is not None:
         location_intel = location_intel.model_copy(update={"competition_density": sim.competition_density})
 

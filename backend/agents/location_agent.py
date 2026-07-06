@@ -20,16 +20,30 @@ NEIGHBORHOOD_DATABASE = {
     "secunderabad": {"lat": 17.4399, "lng": 78.4983, "footfall": 80, "density": 68, "access": 88, "growth": 70}
 }
 
-def analyze_location(location_str: str, business_type: str) -> LocationMetrics:
+def analyze_location(
+    location_str: str,
+    business_type: str,
+    precise_lat: float = None,
+    precise_lng: float = None,
+) -> LocationMetrics:
+    """
+    Scores a location on footfall/competition/accessibility/growth using the
+    hardcoded neighborhood heuristic dataset (no live footfall/GIS data source
+    exists to compute these from real signals). The coordinates returned,
+    however, prefer the exact point the user picked on the map (precise_lat/
+    precise_lng, from the Uber-style location picker + Geocoding API) over the
+    neighborhood's fixed centroid — so the report always reflects the real
+    pin, even though the 0-100 scores remain a same-neighborhood approximation.
+    """
     loc_lower = location_str.lower().strip()
-    
+
     # Find matching neighborhood in our database
     matched_data = None
     for name, data in NEIGHBORHOOD_DATABASE.items():
         if name in loc_lower:
             matched_data = data
             break
-            
+
     # Default fallback (Bangalore center) if no match is found
     if not matched_data:
         # Check if the text contains Hyderabad anywhere
@@ -37,14 +51,14 @@ def analyze_location(location_str: str, business_type: str) -> LocationMetrics:
             matched_data = NEIGHBORHOOD_DATABASE["hyderabad"]
         else:
             matched_data = NEIGHBORHOOD_DATABASE["bangalore"]
-            
+
     # Adjust metrics slightly based on business type to make it feel customized
     bus_lower = business_type.lower()
     footfall = matched_data["footfall"]
     density = matched_data["density"]
     access = matched_data["access"]
     growth = matched_data["growth"]
-    
+
     if "cafe" in bus_lower or "restaurant" in bus_lower:
         # Cafes care a lot about high footfall and access
         footfall = min(100, footfall + 2)
@@ -57,12 +71,16 @@ def analyze_location(location_str: str, business_type: str) -> LocationMetrics:
         # Salons need good accessibility
         access = min(100, access + 3)
         density = max(10, density - 5)
-        
+
+    # Prefer the exact map-picked coordinates over the neighborhood centroid.
+    latitude = precise_lat if precise_lat is not None else matched_data["lat"]
+    longitude = precise_lng if precise_lng is not None else matched_data["lng"]
+
     return LocationMetrics(
         footfall_score=footfall,
         competition_density=density,
         accessibility_score=access,
         growth_potential=growth,
-        latitude=matched_data["lat"],
-        longitude=matched_data["lng"]
+        latitude=latitude,
+        longitude=longitude,
     )

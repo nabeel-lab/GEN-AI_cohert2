@@ -5,6 +5,7 @@ import {
   Store, MapPin, Wallet, FileText, AlertCircle,
 } from 'lucide-react'
 import AgentStatusPanel from '../components/AgentStatusPanel'
+import LocationPicker from '../components/LocationPicker'
 
 // ── Form steps definition ──────────────────────────────────────────────────
 const STEPS = [
@@ -59,6 +60,7 @@ export default function AnalysisPage() {
   const [currentStep, setCurrentStep] = useState(0)
   const [answers, setAnswers]         = useState({ business_type: '', location: '', budget: '', description: '' })
   const [inputVal, setInputVal]       = useState('')
+  const [locationData, setLocationData] = useState(null) // rich picker output — lat/lng, address parts, place_id
   const [error, setError]             = useState('')
 
   // Analysis state
@@ -69,6 +71,9 @@ export default function AnalysisPage() {
 
   // ── Validation ────────────────────────────────────────────────────────────
   function validate(val) {
+    if (step.id === 'location') {
+      return locationData ? '' : 'Please confirm a location on the map before continuing.'
+    }
     const v = val.trim()
     if (!v) return 'Please fill in this field before continuing.'
     if (step.id === 'budget') {
@@ -88,7 +93,16 @@ export default function AnalysisPage() {
     if (err) { setError(err); return }
     setError('')
 
-    const newAnswers = { ...answers, [step.id]: inputVal.trim() }
+    const newAnswers = step.id === 'location'
+      ? {
+          ...answers,
+          location: locationData.formatted_address
+            || [locationData.locality, locationData.city].filter(Boolean).join(', ')
+            || locationData.free_text
+            || '',
+          location_data: locationData,
+        }
+      : { ...answers, [step.id]: inputVal.trim() }
     setAnswers(newAnswers)
 
     if (currentStep < STEPS.length - 1) {
@@ -118,11 +132,25 @@ export default function AnalysisPage() {
     setAnimDone(false)
 
     try {
+      const loc = data.location_data
       const payload = {
         business_type: data.business_type,
         location:      data.location,
         budget:        parseFloat(data.budget),
         description:   data.description,
+        // Precise location data from the map picker — optional on the
+        // backend, so this stays backward compatible if ever omitted.
+        ...(loc && loc.latitude != null ? {
+          latitude:          loc.latitude,
+          longitude:         loc.longitude,
+          formatted_address: loc.formatted_address || undefined,
+          place_id:          loc.place_id || undefined,
+          locality:          loc.locality || undefined,
+          city:              loc.city || undefined,
+          state:             loc.state || undefined,
+          country:           loc.country || undefined,
+          postal_code:       loc.postal_code || undefined,
+        } : {}),
       }
 
       const res = await fetch('/api/analyze', {
@@ -247,7 +275,13 @@ export default function AnalysisPage() {
               </div>
 
               {/* Input */}
-              {step.type === 'textarea' ? (
+              {step.id === 'location' ? (
+                <LocationPicker
+                  initialQuery={answers.location}
+                  initialLocation={answers.location_data || null}
+                  onChange={(loc) => { setLocationData(loc); setError('') }}
+                />
+              ) : step.type === 'textarea' ? (
                 <textarea
                   autoFocus
                   rows={4}

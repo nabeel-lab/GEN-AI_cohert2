@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Download, RefreshCw, CheckCircle2, XCircle, AlertTriangle,
   TrendingUp, TrendingDown, Minus, MapPin, Users, Shield, BarChart3,
   Truck, Megaphone, UserCheck, Brain, Star, AlertCircle, Sparkles,
-  Target, Lightbulb, Flag, Compass, Gauge,
+  Target, Lightbulb, Flag, Compass, Gauge, ExternalLink, Loader2,
 } from 'lucide-react'
 import {
   AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid,
@@ -12,6 +12,7 @@ import {
 } from 'recharts'
 import WhatIfSimulator from '../components/WhatIfSimulator'
 import ChatPanel from '../components/ChatPanel'
+import { loadGoogleMaps, hasMapsApiKey, DARK_MAP_STYLE } from '../lib/googleMaps'
 
 // ── Tab definitions ──────────────────────────────────────────────────────────
 const TABS = [
@@ -771,7 +772,6 @@ function LocationTab({ report }) {
     { label: 'Accessibility',        value: loc.accessibility_score, color: 'green' },
     { label: 'Growth Potential',     value: loc.growth_potential,    color: 'blue' },
   ]
-  const mapsUrl = `https://www.google.com/maps/embed/v1/place?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''}&q=${loc.latitude},${loc.longitude}&zoom=15`
 
   return (
     <div className="flex flex-col gap-6">
@@ -794,24 +794,132 @@ function LocationTab({ report }) {
         </div>
       </div>
 
-      <div className="glass rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-white/5">
+      <LocationMap latitude={loc.latitude} longitude={loc.longitude} businessName={report.business_profile?.business_type} location={report.request?.location} />
+    </div>
+  )
+}
+
+// ── Location Map with graceful fallback ─────────────────────────────────────
+// Uses the Maps JavaScript API (a real interactive map + marker) rather than
+// the Embed API iframe — consistent with the picker used during analysis,
+// and lets us apply the same dark map styling. If the SDK fails to load
+// (network issue, key/API problem), we show a permanent fallback underneath:
+// coordinates + "Open in Google Maps" link, which needs no API key at all,
+// so the section is never blank regardless of Google Maps' own state.
+function LocationMap({ latitude, longitude, businessName, location }) {
+  const mapDivRef = useRef(null)
+  const [sdkState, setSdkState] = useState('loading') // loading | ready | error | no-key
+  const [loadError, setLoadError] = useState('')
+  const [reloadKey, setReloadKey] = useState(0)
+
+  const query = `${latitude},${longitude}`
+  const openInMapsUrl = `https://www.google.com/maps/search/?api=1&query=${query}`
+
+  useEffect(() => {
+    if (!hasMapsApiKey()) {
+      setSdkState('no-key')
+      return
+    }
+
+    let cancelled = false
+    setSdkState('loading')
+
+    loadGoogleMaps()
+      .then(() => {
+        if (cancelled || !mapDivRef.current) return
+
+        const center = { lat: latitude, lng: longitude }
+        const map = new window.google.maps.Map(mapDivRef.current, {
+          center,
+          zoom: 15,
+          styles: DARK_MAP_STYLE,
+          disableDefaultUI: true,
+          zoomControl: true,
+          gestureHandling: 'cooperative',
+        })
+
+        new window.google.maps.Marker({
+          position: center,
+          map,
+          animation: window.google.maps.Animation.DROP,
+        })
+
+        setSdkState('ready')
+      })
+      .catch((err) => {
+        if (cancelled) return
+        console.error('Google Maps failed to load:', err)
+        setLoadError(err?.message || 'Failed to load Google Maps.')
+        setSdkState('error')
+      })
+
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latitude, longitude, reloadKey])
+
+  return (
+    <div className="glass rounded-2xl overflow-hidden">
+      <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between gap-4">
+        <div>
           <h3 className="font-semibold">Location Map</h3>
           <p className="text-slate-500 text-xs mt-0.5">
-            {loc.latitude.toFixed(4)}, {loc.longitude.toFixed(4)}
+            {businessName ? `${businessName} · ` : ''}{location ? `${location} · ` : ''}
+            {latitude.toFixed(4)}, {longitude.toFixed(4)}
           </p>
         </div>
-        <iframe
-          title="Business Location Map"
-          src={mapsUrl}
-          width="100%"
-          height="340"
-          style={{ border: 0, display: 'block' }}
-          allowFullScreen
-          loading="lazy"
-          referrerPolicy="no-referrer-when-downgrade"
-        />
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {sdkState !== 'no-key' && (
+            <button
+              onClick={() => setReloadKey((k) => k + 1)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-medium transition-colors"
+            >
+              <RefreshCw size={13} /> Retry
+            </button>
+          )}
+          <a
+            href={openInMapsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gold-500/10 hover:bg-gold-500/20 text-gold-400 text-xs font-medium transition-colors"
+          >
+            <ExternalLink size={13} /> Open in Google Maps
+          </a>
+        </div>
       </div>
+
+      {sdkState === 'no-key' && (
+        <div className="flex flex-col items-center justify-center gap-3 py-14 px-6 text-center bg-navy-800/30">
+          <MapPin size={28} className="text-slate-600" />
+          <p className="text-slate-400 text-sm max-w-sm">
+            Map preview isn't configured for this environment. Use the
+            "Open in Google Maps" button above to view this location.
+          </p>
+        </div>
+      )}
+
+      {sdkState === 'error' && (
+        <div className="flex flex-col items-center justify-center gap-3 py-14 px-6 text-center bg-red-500/5">
+          <AlertTriangle size={28} className="text-red-400" />
+          <p className="text-slate-300 text-sm font-medium">Couldn't load the map</p>
+          <p className="text-slate-500 text-xs max-w-sm">{loadError}</p>
+        </div>
+      )}
+
+      {(sdkState === 'ready' || sdkState === 'loading') && (
+        <div className="relative">
+          {/* Google Maps takes ownership of this div's DOM once initialized —
+              it must never have React-rendered children, or React's
+              reconciliation conflicts with Maps' own DOM mutations on
+              unmount/update (NotFoundError: removeChild). The loading
+              spinner is a sibling overlay instead. */}
+          <div ref={mapDivRef} className="w-full h-[340px] bg-navy-800" />
+          {sdkState === 'loading' && (
+            <div className="absolute inset-0 flex items-center justify-center bg-navy-800 pointer-events-none">
+              <Loader2 size={22} className="text-gold-400 animate-spin" />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

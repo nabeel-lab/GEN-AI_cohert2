@@ -136,3 +136,32 @@ body {
 .animate-fade-in-up[data-stagger] {
   animation-delay: calc(var(--stagger-i, 0) * 60ms);
 }
+
+/* Advanced Marker drop-in animation — retriggered via a class toggle since
+   AdvancedMarkerElement has no built-in Animation.DROP equivalent. */
+@keyframes lw-marker-drop {
+  0%   { transform: translateY(-28px) scale(0.8); opacity: 0; }
+  60%  { transform: translateY(4px) scale(1.05); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+.lw-marker-pin {
+  transform-origin: bottom center;
+}
+.lw-marker-pin.lw-marker-pin--dropping {
+  animation: lw-marker-drop 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Places API (New) autocomplete element — match the app's dark input style.
+   Supported CSS custom properties per Google's theming API. */
+.lw-place-autocomplete-container {
+  --gmpx-color-surface: #16213a;
+  --gmpx-color-on-surface: #e2e8f0;
+  --gmpx-color-on-surface-variant: #64748b;
+  --gmpx-color-primary: #d4af37;
+  --gmpx-font-family-base: 'Inter', sans-serif;
+  background: #16213a;
+}
+.lw-place-autocomplete-container gmp-place-autocomplete {
+  width: 100%;
+  display: block;
+}
