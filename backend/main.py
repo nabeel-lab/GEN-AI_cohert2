@@ -18,9 +18,15 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelna
 logger = logging.getLogger("launchwise.main")
 
 # Import schemas and agents
-from models import AnalysisRequest, FinalReport, DatasetKPIReport
+from models import (
+    AnalysisRequest, FinalReport, DatasetKPIReport,
+    SimulationRequest, SimulationResult, MarketReport, CompetitorReport,
+    CustomerPersona, SupplyChainItem, MarketingCampaign, ChatRequest, ChatResponse,
+)
 import agents
+from agents.decision_agent import compute_score_breakdown, compute_health_score, compute_confidence
 import services
+from services.analytics_summary import get_summary as get_analytics_summary
 
 app = FastAPI(title="LaunchWise AI - Master Decision Intelligence Server")
 
@@ -75,7 +81,50 @@ except Exception as e:
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
+    """
+    Enhanced health check verifying all GCP service integrations.
+    Returns detailed status for each service.
+    """
+    health_status = {
+        "status": "healthy",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "services": {}
+    }
+
+    # Check Gemini
+    try:
+        from agents.gemini_helper import _key_valid
+        health_status["services"]["gemini"] = "connected" if _key_valid else "disconnected (fallback active)"
+    except Exception as e:
+        health_status["services"]["gemini"] = f"error: {str(e)}"
+
+    # Check Firestore
+    health_status["services"]["firestore"] = "connected" if firestore_db else "disconnected (JSON fallback active)"
+
+    # Check BigQuery
+    try:
+        from services.bigquery_service import is_available
+        health_status["services"]["bigquery"] = "connected" if is_available() else "disconnected (local aggregation)"
+    except Exception as e:
+        health_status["services"]["bigquery"] = f"error: {str(e)}"
+
+    # Check Cloud Storage
+    try:
+        from services.storage_service import is_available
+        health_status["services"]["storage"] = "connected" if is_available() else "disconnected (local serving)"
+    except Exception as e:
+        health_status["services"]["storage"] = f"error: {str(e)}"
+
+    # Check Maps API
+    health_status["services"]["maps"] = "configured" if MAPS_API_KEY else "not configured"
+
+    # Check local fallbacks
+    health_status["fallbacks"] = {
+        "sessions_dir": os.path.exists(SESSIONS_DIR),
+        "uploads_dir": os.path.exists(UPLOADS_DIR),
+    }
+
+    return health_status
 
 @app.post("/analyze", response_model=FinalReport)
 def run_orchestration(request: AnalysisRequest):
@@ -280,6 +329,251 @@ async def upload_business_data(file: UploadFile = File(...)):
         # Uploaded file is only needed transiently for this request's analysis.
         if os.path.exists(saved_path):
             os.remove(saved_path)
+
+
+@app.post("/simulate", response_model=SimulationResult)
+def simulate_scenario(sim: SimulationRequest):
+    """
+    What-If Simulator — recomputes the health score, ROI, risk, break-even,
+    and verdict for a modified scenario against an existing session's
+    baseline (market intelligence, competitors, personas, supply chain,
+    marketing). Deliberately makes ZERO Gemini calls: location, finance, and
+    risk are all deterministic formula-based agents, so this responds
+    instantly and can be called on every slider movement in the UI.
+    """
+    save_path = os.path.join(SESSIONS_DIR, f"{sim.session_id}.json")
+    if not os.path.exists(save_path):
+        raise HTTPException(status_code=404, detail=f"Report session {sim.session_id} not found.")
+
+    with open(save_path, "r") as f:
+        base = json.load(f)
+
+    business_type = sim.business_type or base["request"]["business_type"]
+    location_str = sim.location or base["request"]["location"]
+    budget = sim.budget if sim.budget is not None else base["request"]["budget"]
+
+    # Recompute location + finance + risk — all pure formula agents, no API calls.
+    location_intel = agents.analyze_location(location_str, business_type)
+    if sim.competition_density is not None:
+        location_intel = location_intel.model_copy(update={"competition_density": sim.competition_density})
+
+    sim_request = AnalysisRequest(
+        business_type=business_type, location=location_str, budget=budget,
+        description=base["request"]["description"],
+    )
+    finance_intel = agents.get_finance(
+        sim_request,
+        rent_override=sim.rent_override,
+        marketing_multiplier=sim.marketing_multiplier or 1.0,
+    )
+    risk_intel = agents.evaluate_risk(business_type, budget, location_intel.competition_density)
+
+    # Reuse the original market/competitor/persona/supply-chain/marketing data —
+    # demand and personas don't meaningfully change from budget/rent/location tweaks
+    # within the same city, so re-running Gemini for them would add latency for no signal.
+    market_intel = MarketReport(**base["market_intelligence"])
+    competitors = CompetitorReport(**base["competitors"])
+    personas = [CustomerPersona(**p) for p in base["personas"]]
+    supply_chain = [SupplyChainItem(**s) for s in base["supply_chain"]]
+    marketing = [MarketingCampaign(**m) for m in base["marketing"]]
+
+    score_breakdown = compute_score_breakdown(market_intel, location_intel, finance_intel, risk_intel, personas, supply_chain, marketing)
+    health_score = compute_health_score(score_breakdown)
+    confidence_score, _ = compute_confidence(score_breakdown, risk_intel, market_intel)
+
+    if health_score >= 70:
+        verdict = "GO"
+    elif health_score >= 45:
+        verdict = "PROCEED WITH CAUTION"
+    else:
+        verdict = "NO GO"
+
+    return SimulationResult(
+        business_health_score=health_score,
+        confidence_score=confidence_score,
+        go_no_go=verdict,
+        risk_score=risk_intel.risk_score,
+        risk_level=risk_intel.risk_level,
+        roi_percentage=finance_intel.roi_percentage,
+        break_even_months=finance_intel.break_even_months,
+        score_breakdown=score_breakdown,
+    )
+
+
+@app.post("/chat", response_model=ChatResponse)
+def chat_with_report(chat: ChatRequest):
+    """AI Chat Assistant — answers a question grounded in one session's report."""
+    save_path = os.path.join(SESSIONS_DIR, f"{chat.session_id}.json")
+    if not os.path.exists(save_path):
+        raise HTTPException(status_code=404, detail=f"Report session {chat.session_id} not found.")
+
+    with open(save_path, "r") as f:
+        report = json.load(f)
+
+    answer = agents.answer_question(report, chat.question)
+    return ChatResponse(answer=answer)
+
+
+@app.get("/analytics/summary")
+def get_analytics():
+    """Returns aggregated analytics across all analyzed businesses.
+    Gracefully falls back to aggregating local sessions/*.json if BigQuery unavailable."""
+    return get_analytics_summary()
+
+
+@app.post("/test/full-pipeline")
+def test_full_pipeline():
+    """
+    Full-pipeline integration test for deployment verification.
+    Executes complete workflow: analyze → save → insert → generate PDF → upload.
+    """
+    logger.info("🧪 Starting full-pipeline test...")
+    test_results = {
+        "success": False,
+        "steps": {},
+        "errors": [],
+    }
+
+    try:
+        # Step 1: Create test request
+        logger.info("✓ Step 1: Creating test business request...")
+        test_request = AnalysisRequest(
+            business_type="Specialty Coffee Café",
+            location="Indiranagar, Bangalore",
+            budget=1500000,
+            description="A premium coffee shop targeting remote workers with focus on quality and ambiance.",
+        )
+        test_results["steps"]["request_created"] = True
+        logger.info("✓ Request created successfully")
+
+        # Step 2: Run complete analysis pipeline
+        logger.info("✓ Step 2: Running 10-agent analysis pipeline...")
+        session_id = str(uuid.uuid4())
+
+        biz_profile = agents.analyze_business(test_request)
+        market_intel = agents.run_market_analysis(test_request)
+        competitor_intel = agents.analyze_competitors(test_request.business_type)
+        location_intel = agents.analyze_location(test_request.location, test_request.business_type)
+        finance_intel = agents.get_finance(test_request)
+        risk_intel = agents.evaluate_risk(test_request.business_type, test_request.budget, location_intel.competition_density)
+        personas = agents.get_personas(test_request.business_type)
+        supply_chain = agents.get_supply_chain(test_request.business_type)
+        marketing = agents.get_marketing(test_request.business_type)
+
+        score_breakdown = compute_score_breakdown(market_intel, location_intel, finance_intel, risk_intel, personas, supply_chain, marketing)
+        health_score = compute_health_score(score_breakdown)
+        confidence_score, factors = compute_confidence(score_breakdown, risk_intel, market_intel)
+
+        if health_score >= 70:
+            verdict = "GO"
+        elif health_score >= 45:
+            verdict = "PROCEED WITH CAUTION"
+        else:
+            verdict = "NO GO"
+
+        logger.info(f"✓ Analysis complete: {verdict} (Health: {health_score}/100, Confidence: {confidence_score}%)")
+        test_results["steps"]["analysis_complete"] = True
+
+        # Step 3: Build final report
+        logger.info("✓ Step 3: Building final report...")
+        report = FinalReport(
+            session_id=session_id,
+            business_profile=biz_profile,
+            market_research=market_intel,
+            competitors=competitor_intel,
+            location_research=location_intel,
+            financial_outlook=finance_intel,
+            risk_assessment=risk_intel,
+            customer_personas=personas,
+            supply_chain_analysis=supply_chain,
+            marketing_strategy=marketing,
+            decision={
+                "go_no_go": verdict,
+                "business_health_score": health_score,
+                "confidence_factors": factors,
+                "confidence_score": confidence_score,
+            }
+        )
+        test_results["steps"]["report_built"] = True
+        logger.info("✓ Report built successfully")
+
+        # Step 4: Save to JSON (local fallback)
+        logger.info("✓ Step 4: Saving report to JSON...")
+        save_path = os.path.join(SESSIONS_DIR, f"{session_id}.json")
+        with open(save_path, "w") as f:
+            json.dump(report.dict(), f, indent=2)
+        test_results["steps"]["json_saved"] = True
+        logger.info(f"✓ JSON saved to {save_path}")
+
+        # Step 5: Insert to BigQuery (if available)
+        logger.info("✓ Step 5: Inserting to BigQuery...")
+        try:
+            from services.bigquery_service import insert_report
+            inserted = insert_report(report)
+            test_results["steps"]["bigquery_inserted"] = inserted
+            if inserted:
+                logger.info("✓ BigQuery insert successful")
+            else:
+                logger.warning("⚠ BigQuery insert skipped (service unavailable)")
+        except Exception as e:
+            logger.warning(f"⚠ BigQuery insert failed: {e}")
+            test_results["steps"]["bigquery_inserted"] = False
+
+        # Step 6: Generate PDF
+        logger.info("✓ Step 6: Generating PDF report...")
+        try:
+            from services.pdf_service import generate_investor_report
+            pdf_bytes = generate_investor_report(report)
+            test_results["steps"]["pdf_generated"] = True
+            logger.info(f"✓ PDF generated ({len(pdf_bytes)} bytes)")
+        except Exception as e:
+            logger.warning(f"⚠ PDF generation failed: {e}")
+            test_results["steps"]["pdf_generated"] = False
+            pdf_bytes = None
+
+        # Step 7: Upload to Cloud Storage (if available)
+        logger.info("✓ Step 7: Uploading to Cloud Storage...")
+        try:
+            from services.storage_service import upload_pdf
+            if pdf_bytes:
+                pdf_url = upload_pdf(session_id, pdf_bytes)
+                test_results["steps"]["storage_uploaded"] = True
+                test_results["pdf_url"] = pdf_url
+                logger.info(f"✓ PDF uploaded: {pdf_url}")
+            else:
+                logger.warning("⚠ PDF upload skipped (PDF not generated)")
+                test_results["steps"]["storage_uploaded"] = False
+        except Exception as e:
+            logger.warning(f"⚠ Cloud Storage upload failed: {e}")
+            test_results["steps"]["storage_uploaded"] = False
+
+        # Step 8: Save to Firestore (if available)
+        logger.info("✓ Step 8: Saving to Firestore...")
+        if firestore_db:
+            try:
+                firestore_db.collection("analyses").document(session_id).set(report.dict())
+                test_results["steps"]["firestore_saved"] = True
+                logger.info("✓ Firestore save successful")
+            except Exception as e:
+                logger.warning(f"⚠ Firestore save failed: {e}")
+                test_results["steps"]["firestore_saved"] = False
+        else:
+            logger.info("ℹ Firestore not available (JSON fallback active)")
+            test_results["steps"]["firestore_saved"] = False
+
+        # Mark overall success
+        test_results["success"] = True
+        test_results["session_id"] = session_id
+        test_results["verdict"] = verdict
+        test_results["health_score"] = health_score
+
+        logger.info("✅ Full-pipeline test completed successfully!")
+        return test_results
+
+    except Exception as e:
+        logger.error(f"❌ Full-pipeline test failed: {e}", exc_info=True)
+        test_results["errors"].append(str(e))
+        return test_results
 
 
 if __name__ == "__main__":

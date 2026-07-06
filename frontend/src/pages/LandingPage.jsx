@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, Brain, MapPin, TrendingUp, Shield, Users, BarChart3, Zap, CheckCircle } from 'lucide-react'
+import { ArrowRight, Brain, MapPin, TrendingUp, Shield, Users, BarChart3, Zap, CheckCircle, Play } from 'lucide-react'
+import { DEMO_SCENARIOS } from '../data/demoScenarios'
 
 const AGENTS = [
   { icon: Brain,      label: 'Business Intelligence' },
@@ -47,15 +48,31 @@ const STEPS = [
 export default function LandingPage() {
   const navigate = useNavigate()
 
+  function loadDemoScenario(scenarioId) {
+    const scenario = DEMO_SCENARIOS.find(s => s.id === scenarioId)
+    if (scenario) {
+      sessionStorage.setItem('lw_report', JSON.stringify(scenario.report))
+      navigate('/results')
+    }
+  }
+
   return (
     <div className="min-h-screen bg-navy-gradient text-slate-100 overflow-x-hidden">
 
       {/* ── Navbar ── */}
       <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-white/5">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">🚀</span>
-            <span className="text-lg font-bold text-gold-gradient">LaunchWise AI</span>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2 cursor-pointer hover:opacity-80" onClick={() => navigate('/')}>
+              <span className="text-2xl">🚀</span>
+              <span className="text-lg font-bold text-gold-gradient">LaunchWise AI</span>
+            </div>
+            <button
+              onClick={() => navigate('/analytics')}
+              className="hidden sm:inline text-sm text-slate-400 hover:text-slate-100 transition-colors"
+            >
+              Analytics
+            </button>
           </div>
           <button
             onClick={() => navigate('/analyze')}
@@ -98,6 +115,38 @@ export default function LandingPage() {
               <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
             </button>
             <p className="text-slate-500 text-sm">No sign-up required · Free to use</p>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Demo Scenarios ── */}
+      <section className="py-16 px-6 border-b border-white/5 bg-navy-800/30">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-10">
+            <h2 className="text-2xl font-bold mb-2">Try a Pre-Built Demo</h2>
+            <p className="text-slate-400 text-sm">See LaunchWise in action. Instant, real analysis. No sign-up needed.</p>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-4">
+            {DEMO_SCENARIOS.map((scenario) => (
+              <button
+                key={scenario.id}
+                onClick={() => loadDemoScenario(scenario.id)}
+                className="group glass rounded-xl p-5 text-left hover:bg-white/8 hover:border-gold-500/30 transition-all duration-200 border border-white/10"
+              >
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  <div>
+                    <div className="text-lg font-semibold text-slate-100 group-hover:text-gold-400 transition-colors">{scenario.label}</div>
+                    <div className="text-xs text-slate-500 mt-1">{scenario.subtitle}</div>
+                  </div>
+                  <Play size={16} className="text-gold-500/50 group-hover:text-gold-400 flex-shrink-0 mt-1 transition-colors" />
+                </div>
+                <div className="text-xs text-slate-400 leading-relaxed">
+                  Verdict: <span className={scenario.report.decision.go_no_go === 'GO' ? 'text-emerald-400 font-semibold' : 'text-gold-400 font-semibold'}>
+                    {scenario.report.decision.go_no_go}
+                  </span> · Health: <span className="text-slate-300">{scenario.report.decision.business_health_score}/100</span>
+                </div>
+              </button>
+            ))}
           </div>
         </div>
       </section>

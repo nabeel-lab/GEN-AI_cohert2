@@ -136,6 +136,38 @@ class FinalReport(BaseModel):
     json_url: Optional[str] = None
 
 
+# --- What-If Simulator ---
+class SimulationRequest(BaseModel):
+    session_id: str = Field(..., description="Original analysis session to use as the baseline")
+    business_type: Optional[str] = None
+    location: Optional[str] = None
+    budget: Optional[float] = None
+    competition_density: Optional[int] = Field(None, ge=0, le=100)
+    rent_override: Optional[float] = None
+    marketing_multiplier: Optional[float] = Field(None, ge=0.5, le=2.0)
+
+
+class SimulationResult(BaseModel):
+    business_health_score: int
+    confidence_score: int
+    go_no_go: str
+    risk_score: int
+    risk_level: str
+    roi_percentage: float
+    break_even_months: int
+    score_breakdown: Dict[str, int]
+
+
+# --- AI Chat Assistant ---
+class ChatRequest(BaseModel):
+    session_id: str
+    question: str = Field(..., min_length=1, max_length=500)
+
+
+class ChatResponse(BaseModel):
+    answer: str
+
+
 # --- Uploaded Dataset Analysis (Analytics Agent) ---
 class DatasetKPIReport(BaseModel):
     filename: str

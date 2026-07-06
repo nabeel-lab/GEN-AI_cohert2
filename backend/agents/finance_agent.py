@@ -40,16 +40,25 @@ def _resolve_type_key(business_type: str) -> str:
     return "cafe"  # safe default
 
 
-def get_finance(request: AnalysisRequest) -> EconomicReport:
+def get_finance(
+    request: AnalysisRequest,
+    rent_override: float = None,
+    marketing_multiplier: float = 1.0,
+) -> EconomicReport:
     """
     Formula-based financial projection agent.
     Uses business-type-specific lookup tables for rent and raw material ratios.
     Applies a realistic S-curve growth model over 12 months.
+
+    rent_override and marketing_multiplier are optional knobs used by the
+    What-If Simulator (POST /simulate) to recompute a forecast instantly
+    without any Gemini call — both default to the original behavior so
+    every existing caller (the main /analyze pipeline) is unaffected.
     """
     budget = request.budget
     key = _resolve_type_key(request.business_type)
 
-    rent_est = RENT_BY_TYPE[key]
+    rent_est = rent_override if rent_override is not None else RENT_BY_TYPE[key]
     raw_material_ratio = RAW_MATERIAL_RATIO[key]
 
     # Staff cost: 8–12% of budget depending on scale
@@ -60,8 +69,9 @@ def get_finance(request: AnalysisRequest) -> EconomicReport:
     else:
         staff_est = budget * 0.10
 
-    # Base monthly revenue: conservative 6% of budget
-    base_monthly_rev = budget * 0.06
+    # Base monthly revenue: conservative 6% of budget, scaled by marketing
+    # effort (1.0 = no change; simulator allows 0.5x-2.0x to model spend impact)
+    base_monthly_rev = budget * 0.06 * marketing_multiplier
 
     forecast: list[ForecastItem] = []
     accumulated_profit = 0.0

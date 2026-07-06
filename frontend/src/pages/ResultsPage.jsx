@@ -10,6 +10,8 @@ import {
   AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts'
+import WhatIfSimulator from '../components/WhatIfSimulator'
+import ChatPanel from '../components/ChatPanel'
 
 // ── Tab definitions ──────────────────────────────────────────────────────────
 const TABS = [
@@ -1120,6 +1122,16 @@ export default function ResultsPage() {
           <ActiveTabComponent report={report} />
         </div>
       </div>
+
+      {/* What-If Simulator & Chat Assistant floating panels */}
+      <WhatIfSimulator
+        report={report}
+        onResult={(result) => {
+          // Update display with simulation results — brief notification
+          console.log('Simulation result:', result)
+        }}
+      />
+      <ChatPanel sessionId={report.session_id} />
     </div>
   )
 }
