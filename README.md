@@ -542,15 +542,6 @@ Contributions welcome! The codebase is structured for easy extension:
 
 ---
 
-## 📞 Support
-
-- **Issues:** GitHub Issues
-- **Discussions:** GitHub Discussions
-- **Email:** support@launchwise.ai
-- **Twitter:** @LaunchWiseAI
-
----
-
 ## 🚀 Deployment Checklist
 
 See [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md) for production readiness verification and deployment instructions.
@@ -559,6 +550,5 @@ See [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md) for production readiness 
 
 **Built with:** Python, FastAPI, React, Tailwind, Gemini 1.5 Flash, Google Cloud
 
-**Status:** Production-Ready ✅  
-**Last Updated:** 2026-07-06
+
 
