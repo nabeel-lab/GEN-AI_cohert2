@@ -4,19 +4,19 @@ import { setOptions, importLibrary } from '@googlemaps/js-api-loader'
 // of the default light Google Maps skin. Shared by the analysis-time
 // LocationPicker and the results-page LocationMap so both look identical.
 export const DARK_MAP_STYLE = [
-  { elementType: 'geometry', stylers: [{ color: '#1a2436' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#1a2436' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#7d8ba1' }] },
-  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#d4af37' }] },
-  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#8a97ab' }] },
-  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#1f3329' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2a3548' }] },
-  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#1a2436' }] },
-  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#9aa7bd' }] },
-  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#3a4a63' }] },
-  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#252f42' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0f1824' }] },
-  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#4a5a75' }] },
+  { elementType: 'geometry', stylers: [{ color: '#09090b' }] }, // zinc-950
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#09090b' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#71717a' }] }, // zinc-500
+  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#d4d4d8' }] }, // zinc-300
+  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#52525b' }] }, // zinc-600
+  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#18181b' }] }, // zinc-900
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#18181b' }] }, // zinc-900
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#27272a' }] }, // zinc-800
+  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#52525b' }] }, // zinc-600
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#27272a' }] }, // zinc-800
+  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#18181b' }] }, // zinc-900
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#000000' }] }, // black
+  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#3f3f46' }] }, // zinc-700
 ]
 
 // Singleton loader — the JS API bootstrap must only be configured once per

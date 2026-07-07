@@ -1,52 +1,43 @@
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, Brain, MapPin, TrendingUp, Shield, Users, BarChart3, Zap, CheckCircle, Play } from 'lucide-react'
+import { motion, useScroll, useTransform } from 'framer-motion'
 import { DEMO_SCENARIOS } from '../data/demoScenarios'
+import { ArrowRight, Play, Brain, Database, BarChart3, MapPin, Cloud, LayoutTemplate, Activity, Target, Zap, Server, Shield, Network, Eye, Key } from 'lucide-react'
+import HeroIllustration from '../components/HeroIllustration'
 
-const AGENTS = [
-  { icon: Brain,      label: 'Business Intelligence' },
-  { icon: TrendingUp, label: 'Market Analysis' },
-  { icon: Users,      label: 'Competitor Mapping' },
-  { icon: MapPin,     label: 'Location Scoring' },
-  { icon: BarChart3,  label: 'Financial Forecast' },
-  { icon: Users,      label: 'Customer Personas' },
-  { icon: Zap,        label: 'Supply Chain' },
-  { icon: TrendingUp, label: 'Marketing Strategy' },
-  { icon: Shield,     label: 'Risk Prediction' },
-  { icon: CheckCircle,label: 'Go / No-Go Decision' },
-]
+// --- Cinematic Text Reveals ---
+const titleVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1, delayChildren: 0.2 }
+  }
+}
+const wordVariants = {
+  hidden: { opacity: 0, y: 30, filter: 'blur(8px)' },
+  visible: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] } }
+}
+const AnimatedText = ({ text, className }) => {
+  const words = text.split(" ")
+  return (
+    <motion.h1 variants={titleVariants} initial="hidden" animate="visible" className={className}>
+      {words.map((word, i) => (
+        <motion.span key={i} variants={wordVariants} className="inline-block mr-[0.3em]">
+          {word}
+        </motion.span>
+      ))}
+    </motion.h1>
+  )
+}
 
-const FEATURES = [
-  {
-    icon: Brain,
-    title: '10 Specialized AI Agents',
-    desc: 'Each agent is an expert in its domain — from market trends to supply chains. They run in sequence and feed each other context.',
-  },
-  {
-    icon: BarChart3,
-    title: 'Investor-Ready Reports',
-    desc: 'Get a 12-month financial forecast, competitor SWOT analysis, and a business health score — all in under 60 seconds.',
-  },
-  {
-    icon: MapPin,
-    title: 'Hyper-Local Intelligence',
-    desc: 'Location scoring, footfall data, and competition density mapped to your exact neighborhood in Bangalore or Hyderabad.',
-  },
-  {
-    icon: Shield,
-    title: 'Go / No-Go Verdict',
-    desc: "A single, confident recommendation synthesized from all 10 agents. Know whether to launch before you spend a single rupee.",
-  },
-]
-
-const STEPS = [
-  { step: '01', label: 'Describe your idea',   desc: 'Business type, location, budget, and vision — 4 quick inputs.' },
-  { step: '02', label: '10 agents activate',   desc: 'Watch each specialist agent run in real time on your idea.' },
-  { step: '03', label: 'Review your dashboard',desc: 'Full intelligence report across 8 dimensions.' },
-  { step: '04', label: 'Make your decision',   desc: 'Act on a data-backed Go / No-Go with a clear next-steps roadmap.' },
-]
+const sectionFadeUp = {
+  hidden: { opacity: 0, y: 60, filter: 'blur(10px)' },
+  visible: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { duration: 1, ease: [0.16, 1, 0.3, 1] } }
+}
 
 export default function LandingPage() {
   const navigate = useNavigate()
+  const { scrollYProgress } = useScroll()
+  const yBg = useTransform(scrollYProgress, [0, 1], [0, 200])
 
   function loadDemoScenario(scenarioId) {
     const scenario = DEMO_SCENARIOS.find(s => s.id === scenarioId)
@@ -57,220 +48,275 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-navy-gradient text-slate-100 overflow-x-hidden">
+    <div className="min-h-screen bg-background text-zinc-100 selection:bg-blue-500/20 selection:text-white overflow-hidden relative font-sans">
+      
+      {/* ── Ambient intelligence layers ── */}
+      <div className="fixed inset-0 bg-zinc-950 pointer-events-none z-0" />
+      <motion.div style={{ y: yBg }} className="fixed inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:72px_72px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_30%,transparent_100%)] pointer-events-none z-0" />
 
-      {/* ── Navbar ── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-white/5">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2 cursor-pointer hover:opacity-80" onClick={() => navigate('/')}>
-              <span className="text-2xl">🚀</span>
-              <span className="text-lg font-bold text-gold-gradient">LaunchWise AI</span>
-            </div>
-            <button
-              onClick={() => navigate('/analytics')}
-              className="hidden sm:inline text-sm text-slate-400 hover:text-slate-100 transition-colors"
-            >
-              Analytics
-            </button>
-          </div>
-          <button
-            onClick={() => navigate('/analyze')}
-            className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-lg bg-gold-500 hover:bg-gold-400 text-navy-900 font-semibold text-sm transition-all duration-200 hover:shadow-lg hover:shadow-gold-500/20"
-          >
-            Start Analysis <ArrowRight size={15} />
-          </button>
-        </div>
-      </nav>
+      {/* ── Hero ambient: matches the photo's dark navy interior so the illustration blends naturally ── */}
+      {/* Color sampled from inside the hero-illustration.jpeg: deep indigo-navy #090e1f */}
+      <div
+        className="fixed pointer-events-none z-0"
+        style={{
+          top: 0,
+          right: 0,
+          width: '55%',
+          height: '80vh',
+          background: 'radial-gradient(ellipse 80% 80% at 75% 40%, #090d1d 0%, #070b17 20%, transparent 70%)',
+        }}
+      />
 
-      {/* ── Hero ── */}
-      <section className="pt-36 pb-24 px-6 text-center relative">
-        {/* Layered glow orbs for depth */}
-        <div className="absolute top-24 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-gold-500/5 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute top-40 left-1/3 -translate-x-1/2 w-[300px] h-[200px] bg-accent-teal/5 rounded-full blur-3xl pointer-events-none animate-float" />
+      {/* ── SECTION 1: HERO ── */}
+      <section className="tour-step-hero relative z-10 w-full min-h-[90vh] flex items-center pt-24 pb-16 px-8 md:px-20 lg:px-28 max-w-[1400px] mx-auto">
+        <div className="flex flex-col lg:flex-row items-center w-full justify-between gap-12">
+          
+          <div className="flex-1 max-w-2xl">
+            {/* Status indicator */}
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8, delay: 0.1 }} className="flex items-center gap-3 mb-10">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-60"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-blue-400"></span>
+              </span>
+              <span className="text-[11px] font-mono tracking-[0.2em] text-zinc-500 uppercase">
+                Agentic Orchestration Engine Online
+              </span>
+            </motion.div>
 
-        <div className="relative max-w-4xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-gold text-gold-400 text-sm font-medium mb-8 animate-fade-in-up">
-            <span className="w-2 h-2 rounded-full bg-gold-500 animate-pulse-gold" />
-            Powered by Gemini 1.5 Flash · 10 AI Agents
-          </div>
+            {/* Headline */}
+            <AnimatedText text="Simulate Before You Invest." className="text-[clamp(3.5rem,7vw,6.5rem)] leading-[1.05] font-medium tracking-tight text-zinc-100 mb-8" />
 
-          <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold leading-tight mb-6 tracking-tight animate-fade-in-up" style={{ animationDelay: '80ms' }}>
-            Know before you{' '}
-            <span className="text-gold-gradient">launch.</span>
-          </h1>
-
-          <p className="text-lg sm:text-xl text-slate-400 max-w-2xl mx-auto mb-10 leading-relaxed animate-fade-in-up" style={{ animationDelay: '160ms' }}>
-            LaunchWise AI runs 10 specialized agents on your business idea — analyzing
-            market demand, competitors, location, finances, and risk — then delivers a
-            Go&nbsp;/&nbsp;No-Go verdict in under 60 seconds.
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up" style={{ animationDelay: '240ms' }}>
-            <button
-              onClick={() => navigate('/analyze')}
-              className="group flex items-center gap-3 px-8 py-4 rounded-xl bg-gold-gradient text-navy-900 font-bold text-base transition-all duration-200 hover:shadow-2xl hover:shadow-gold-500/30 hover:scale-105 active:scale-100"
-            >
-              Analyze My Business Idea
-              <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-            </button>
-            <p className="text-slate-500 text-sm">No sign-up required · Free to use</p>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Demo Scenarios ── */}
-      <section className="py-16 px-6 border-b border-white/5 bg-navy-800/30">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-10">
-            <h2 className="text-2xl font-bold mb-2">Try a Pre-Built Demo</h2>
-            <p className="text-slate-400 text-sm">See LaunchWise in action. Instant, real analysis. No sign-up needed.</p>
-          </div>
-          <div className="grid sm:grid-cols-3 gap-4">
-            {DEMO_SCENARIOS.map((scenario) => (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1, delay: 0.8 }} className="max-w-lg">
+              <p className="text-[17px] text-zinc-400 leading-[1.7] font-light mb-12">
+                LaunchWise deploys a network of 10 specialized AI agents to autonomously analyze market dynamics, competitor density, and financial viability. Get a complete executive brief before spending real capital.
+              </p>
+              
               <button
-                key={scenario.id}
-                onClick={() => loadDemoScenario(scenario.id)}
-                className="group glass rounded-xl p-5 text-left hover:bg-white/8 hover:border-gold-500/30 transition-all duration-200 border border-white/10"
+                id="tour-step-cta"
+                onClick={() => navigate('/analyze')}
+                className="tour-step-cta group relative flex items-center justify-between w-full sm:w-auto sm:min-w-[320px] px-8 py-4 bg-zinc-100 text-zinc-900 rounded-full font-semibold text-[15px] hover:bg-white transition-all duration-500 hover:shadow-[0_0_40px_rgba(59,130,246,0.15)] hover:scale-[1.02] active:scale-100"
               >
-                <div className="flex items-start justify-between gap-2 mb-3">
-                  <div>
-                    <div className="text-lg font-semibold text-slate-100 group-hover:text-gold-400 transition-colors">{scenario.label}</div>
-                    <div className="text-xs text-slate-500 mt-1">{scenario.subtitle}</div>
-                  </div>
-                  <Play size={16} className="text-gold-500/50 group-hover:text-gold-400 flex-shrink-0 mt-1 transition-colors" />
-                </div>
-                <div className="text-xs text-slate-400 leading-relaxed">
-                  Verdict: <span className={scenario.report.decision.go_no_go === 'GO' ? 'text-emerald-400 font-semibold' : 'text-gold-400 font-semibold'}>
-                    {scenario.report.decision.go_no_go}
-                  </span> · Health: <span className="text-slate-300">{scenario.report.decision.business_health_score}/100</span>
+                <span className="tracking-tight">Analyze My Business Idea</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-zinc-400 text-[10px] font-mono hidden sm:block">↵</span>
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-300" />
                 </div>
               </button>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Agent Ticker ── */}
-      <section className="py-10 px-6 border-y border-white/5 overflow-hidden">
-        <div className="flex gap-6 animate-[scroll_30s_linear_infinite] w-max">
-          {[...AGENTS, ...AGENTS].map((agent, i) => (
-            <div
-              key={i}
-              className="flex items-center gap-2.5 px-5 py-2.5 rounded-full glass-gold text-slate-300 text-sm font-medium whitespace-nowrap flex-shrink-0"
-            >
-              <agent.icon size={15} className="text-gold-400" />
-              {agent.label}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── Features ── */}
-      <section className="py-24 px-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-              A full consulting team,{' '}
-              <span className="text-gold-gradient">in 60 seconds</span>
-            </h2>
-            <p className="text-slate-400 max-w-xl mx-auto">
-              What used to cost ₹5 lakhs and 3 weeks now takes one form and one minute.
-            </p>
+            </motion.div>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-6">
-            {FEATURES.map((f, i) => (
-              <div
-                key={f.title}
-                className="glass card-lift rounded-2xl p-7 hover:border-gold-500/20 transition-colors duration-300 group animate-fade-in-up"
-                style={{ animationDelay: `${i * 70}ms` }}
-              >
-                <div className="w-11 h-11 rounded-xl bg-gold-500/10 flex items-center justify-center mb-5 group-hover:bg-gold-500/15 transition-colors">
-                  <f.icon size={20} className="text-gold-400" />
-                </div>
-                <h3 className="text-lg font-semibold mb-2">{f.title}</h3>
-                <p className="text-slate-400 text-sm leading-relaxed">{f.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── How It Works ── */}
-      <section className="py-24 px-6 border-t border-white/5">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">How it works</h2>
-            <p className="text-slate-400">Four steps from idea to decision.</p>
-          </div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {STEPS.map((s, i) => (
-              <div key={s.step} className="relative">
-                {/* Connector line */}
-                {i < STEPS.length - 1 && (
-                  <div className="hidden lg:block absolute top-7 left-full w-full h-px bg-gradient-to-r from-gold-500/30 to-transparent z-10" />
-                )}
-                <div className="glass card-lift rounded-2xl p-6 animate-fade-in-up" style={{ animationDelay: `${i * 90}ms` }}>
-                  <div className="text-3xl font-black text-gold-500/20 mb-3">{s.step}</div>
-                  <h3 className="font-semibold mb-2 text-slate-100">{s.label}</h3>
-                  <p className="text-slate-400 text-sm leading-relaxed">{s.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Social Proof Strip ── */}
-      <section className="py-16 px-6 border-t border-white/5">
-        <div className="max-w-4xl mx-auto grid grid-cols-3 gap-8 text-center">
-          {[
-            { value: '10',      label: 'AI Agents' },
-            { value: '6',       label: 'Business Types' },
-            { value: '< 60s',   label: 'Analysis Time' },
-          ].map((stat) => (
-            <div key={stat.label}>
-              <div className="text-4xl font-black text-gold-gradient mb-1">{stat.value}</div>
-              <div className="text-slate-400 text-sm">{stat.label}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── CTA Banner ── */}
-      <section className="py-24 px-6 border-t border-white/5">
-        <div className="max-w-3xl mx-auto text-center glass-gold rounded-3xl p-14">
-          <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-            Ready to find out if your idea will fly?
-          </h2>
-          <p className="text-slate-400 mb-8 leading-relaxed">
-            Type your business idea and location. LaunchWise does the rest.
-          </p>
-          <button
-            onClick={() => navigate('/analyze')}
-            className="group inline-flex items-center gap-3 px-8 py-4 rounded-xl bg-gold-gradient text-navy-900 font-bold text-base transition-all duration-200 hover:shadow-2xl hover:shadow-gold-500/30 hover:scale-105 active:scale-100"
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.6, duration: 1.5, ease: [0.16, 1, 0.3, 1] }}
+            className="flex-1 w-full hidden lg:block"
           >
-            Start Free Analysis
-            <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-          </button>
+            <HeroIllustration />
+          </motion.div>
         </div>
       </section>
 
-      {/* ── Footer ── */}
-      <footer className="py-8 px-6 border-t border-white/5 text-center text-slate-600 text-sm">
-        <span className="text-gold-gradient font-semibold">LaunchWise AI</span>
-        {' '}· Built with Gemini 1.5 Flash · Google Cloud
-      </footer>
+      {/* ── SECTION 2: LIVE BUSINESS SIMULATION ── */}
+      <motion.section 
+        initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={sectionFadeUp}
+        className="tour-step-simulation relative z-10 w-full pt-12 pb-32 px-8 md:px-20 lg:px-28 max-w-[1400px] mx-auto"
+      >
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16">
+          <div className="max-w-2xl">
+            <div className="text-[11px] tracking-[0.2em] text-blue-400 uppercase font-mono mb-6 flex items-center gap-2">
+              <Play size={12} /> Interactive Previews
+            </div>
+            <h2 className="text-4xl md:text-5xl font-medium tracking-tight text-zinc-100 leading-tight">Live Business Simulations.</h2>
+            <p className="text-zinc-400 text-lg font-light mt-6 max-w-xl leading-relaxed">Experience exactly how our agents synthesize data. Review complete executive briefs generated entirely by our architecture for real-world scenarios.</p>
+          </div>
+        </div>
 
-      {/* Ticker keyframe — injected inline since it's a one-off utility */}
-      <style>{`
-        @keyframes scroll {
-          from { transform: translateX(0); }
-          to   { transform: translateX(-50%); }
-        }
-      `}</style>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {DEMO_SCENARIOS.map((scenario, idx) => (
+            <motion.button
+              key={scenario.id}
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: idx * 0.1, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              onClick={() => loadDemoScenario(scenario.id)}
+              className="group text-left p-8 rounded-[24px] bg-zinc-900/40 backdrop-blur-xl border border-zinc-800/80 hover:border-zinc-700/80 shadow-xl shadow-black/20 hover:shadow-2xl hover:shadow-blue-900/10 hover:-translate-y-2 transition-all duration-500 flex flex-col relative overflow-hidden"
+            >
+              <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/0 to-transparent group-hover:via-blue-500/50 transition-colors duration-500" />
+              
+              <div className="flex items-start justify-between w-full mb-12">
+                <div>
+                  <h3 className="text-xl font-medium text-zinc-100 mb-2 tracking-tight group-hover:text-blue-400 transition-colors">{scenario.label}</h3>
+                  <p className="text-sm text-zinc-500 font-light leading-relaxed">{scenario.subtitle}</p>
+                </div>
+                <div className="w-10 h-10 rounded-full bg-zinc-800/80 border border-zinc-700/50 group-hover:bg-blue-500 group-hover:border-blue-400 flex items-center justify-center transition-all duration-400 transform group-hover:scale-110 flex-shrink-0">
+                  <ArrowRight size={16} className="text-zinc-400 group-hover:text-white transition-colors" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4 pt-6 border-t border-zinc-800/50 mt-auto">
+                <div>
+                  <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-600 mb-2">Health</p>
+                  <p className="text-lg font-medium text-zinc-200 tabular-nums">{scenario.report.decision.business_health_score}<span className="text-[11px] text-zinc-600 font-normal ml-1">/100</span></p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-600 mb-2">Risk</p>
+                  <p className={`text-lg font-medium ${scenario.report.risk.risk_level === 'High' ? 'text-red-400' : scenario.report.risk.risk_level === 'Medium' ? 'text-blue-400' : 'text-emerald-400'}`}>
+                    {scenario.report.risk.risk_level}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-600 mb-2">Est. ROI</p>
+                  <p className="text-lg font-medium text-zinc-200 tabular-nums">{scenario.report.finance.roi_percentage > 0 ? '+' : ''}{scenario.report.finance.roi_percentage}%</p>
+                </div>
+              </div>
+            </motion.button>
+          ))}
+        </div>
+      </motion.section>
+
+      {/* ── SECTION 3: 10 SPECIALIZED AI AGENTS (ASYMMETRICAL EDITORIAL) ── */}
+      <motion.section 
+        initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={sectionFadeUp}
+        className="tour-step-agents relative z-10 w-full py-32 px-8 md:px-20 lg:px-28 max-w-[1400px] mx-auto"
+      >
+        <div className="max-w-3xl mb-24">
+          <div className="text-[11px] tracking-[0.2em] text-zinc-500 uppercase font-mono mb-6">Agentic Architecture</div>
+          <h2 className="text-4xl md:text-5xl font-medium tracking-tight mb-8 text-zinc-100 leading-tight">10 Specialized AI Agents.<br/><span className="text-zinc-500 font-light">One Executive Decision.</span></h2>
+          <p className="text-zinc-400 text-lg font-light leading-relaxed max-w-2xl">
+            Unlike standard chatbots, LaunchWise utilizes a decentralized multi-agent orchestration architecture. Each agent commands a specific domain expertise—collaborating, debating, and synthesizing data before yielding a final Go/No-Go verdict.
+          </p>
+        </div>
+        
+        {/* Asymmetrical Layout */}
+        <div className="relative">
+          {/* Subtle connecting background lines */}
+          <div className="absolute top-[20%] bottom-[20%] left-[50%] w-px bg-gradient-to-b from-transparent via-zinc-800 to-transparent hidden lg:block" />
+          <div className="absolute top-[50%] left-[20%] right-[20%] h-px bg-gradient-to-r from-transparent via-zinc-800 to-transparent hidden lg:block" />
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 relative z-10">
+            
+            {/* Lead Agent (Spans larger) */}
+            <motion.div 
+              whileHover={{ scale: 1.02 }}
+              className="lg:col-span-8 p-10 rounded-[32px] bg-gradient-to-br from-zinc-900/80 to-zinc-900/40 border border-zinc-800/80 backdrop-blur-xl relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-blue-500/5 blur-[100px] rounded-full" />
+              <Network size={32} className="text-blue-400 mb-8" />
+              <h3 className="text-2xl font-medium text-zinc-100 mb-4 tracking-tight">The Orchestrator</h3>
+              <p className="text-zinc-400 font-light leading-relaxed max-w-md">
+                The core intelligence engine that breaks down your business prompt, queries real-time APIs, and delegates specific analysis vectors to the 9 subordinate domain agents.
+              </p>
+            </motion.div>
+
+            {/* Support Agent */}
+            <motion.div 
+              whileHover={{ scale: 1.02 }}
+              className="lg:col-span-4 p-8 rounded-[32px] bg-zinc-900/40 border border-zinc-800/80 backdrop-blur-xl flex flex-col justify-end"
+            >
+              <BarChart3 size={24} className="text-emerald-400 mb-6" />
+              <h3 className="text-lg font-medium text-zinc-100 mb-3 tracking-tight">Financial Analyst</h3>
+              <p className="text-zinc-500 text-sm font-light leading-relaxed">
+                Builds robust 12-month P&L models, calculates CapEx vs OpEx, and determines the break-even horizon.
+              </p>
+            </motion.div>
+
+            {/* Support Agent */}
+            <motion.div 
+              whileHover={{ scale: 1.02 }}
+              className="lg:col-span-4 p-8 rounded-[32px] bg-zinc-900/40 border border-zinc-800/80 backdrop-blur-xl"
+            >
+              <Eye size={24} className="text-amber-400 mb-6" />
+              <h3 className="text-lg font-medium text-zinc-100 mb-3 tracking-tight">Market Intel</h3>
+              <p className="text-zinc-500 text-sm font-light leading-relaxed">
+                Scans for local demand trends, seasonality spikes, and calculates the Total Addressable Market (TAM).
+              </p>
+            </motion.div>
+
+            {/* Support Agent */}
+            <motion.div 
+              whileHover={{ scale: 1.02 }}
+              className="lg:col-span-5 p-8 rounded-[32px] bg-zinc-900/40 border border-zinc-800/80 backdrop-blur-xl"
+            >
+              <Shield size={24} className="text-red-400 mb-6" />
+              <h3 className="text-lg font-medium text-zinc-100 mb-3 tracking-tight">Risk Assessment</h3>
+              <p className="text-zinc-500 text-sm font-light leading-relaxed">
+                Identifies critical regulatory constraints, supply chain vulnerabilities, and operational threats before they materialize.
+              </p>
+            </motion.div>
+
+            {/* Micro Agent */}
+            <motion.div 
+              whileHover={{ scale: 1.02 }}
+              className="lg:col-span-3 p-8 rounded-[32px] border border-zinc-800/50 bg-transparent flex flex-col items-center justify-center text-center"
+            >
+              <p className="text-zinc-400 font-medium">+ 6 More Agents</p>
+              <p className="text-zinc-600 text-xs font-mono mt-2">Running parallel logic</p>
+            </motion.div>
+
+          </div>
+        </div>
+      </motion.section>
+
+      {/* ── SECTION 4: HOW IT WORKS ── */}
+      <motion.section 
+        initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={sectionFadeUp}
+        className="relative z-10 w-full py-32 px-8 md:px-20 lg:px-28 max-w-[1400px] mx-auto text-center"
+      >
+        <div className="text-[11px] tracking-[0.2em] text-zinc-500 uppercase font-mono mb-8">The Pipeline</div>
+        <h2 className="text-3xl md:text-4xl font-medium tracking-tight mb-20 text-zinc-100">Intelligent Workflows</h2>
+        
+        <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-10 max-w-5xl mx-auto">
+          {["Idea Input", "Agentic Routing", "Market Intel", "Financial Forecast", "Decision Matrix"].map((step, index, arr) => (
+            <div key={index} className="flex items-center md:flex-col gap-6 relative group">
+              <div className="w-16 h-16 rounded-full border border-zinc-700/50 bg-zinc-900/80 flex items-center justify-center text-sm font-mono text-zinc-400 shadow-xl group-hover:border-blue-500/50 group-hover:text-blue-400 transition-colors z-10">
+                0{index + 1}
+              </div>
+              <div className="text-sm font-medium text-zinc-300 tracking-wide">{step}</div>
+              {index < arr.length - 1 && (
+                <div className="hidden md:block absolute top-8 left-[60%] w-full h-px bg-gradient-to-r from-zinc-800 via-zinc-600 to-zinc-800" />
+              )}
+            </div>
+          ))}
+        </div>
+      </motion.section>
+
+      {/* ── SECTION 5: BUILT WITH GOOGLE CLOUD ── */}
+      <motion.section 
+        initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={sectionFadeUp}
+        className="relative z-10 w-full py-24 px-8 md:px-20 lg:px-28 max-w-[1400px] mx-auto border-t border-zinc-900/50 text-center bg-zinc-950/50"
+      >
+        <div className="text-[11px] tracking-[0.2em] text-zinc-600 uppercase font-mono mb-12">
+          Engineered for scale with
+        </div>
+        <div className="flex flex-wrap justify-center items-center gap-x-16 gap-y-12 opacity-60">
+          {[
+            { icon: Brain, label: "Gemini 1.5 Pro", color: "text-blue-500" },
+            { icon: Database, label: "Firestore", color: "text-yellow-500" },
+            { icon: Server, label: "BigQuery", color: "text-blue-400" },
+            { icon: MapPin, label: "Google Maps API", color: "text-green-500" },
+            { icon: Zap, label: "Cloud Run", color: "text-blue-300" }
+          ].map((Tech, i) => (
+            <div key={i} className="flex flex-col items-center gap-4 grayscale hover:grayscale-0 transition-all duration-500 cursor-default">
+              <Tech.icon size={28} className={Tech.color} />
+              <span className="text-xs font-semibold text-zinc-300 tracking-wider uppercase">{Tech.label}</span>
+            </div>
+          ))}
+        </div>
+      </motion.section>
+
+      {/* ── SECTION 6: FOOTER ── */}
+      <footer className="relative z-10 w-full py-12 px-8 md:px-20 lg:px-28 max-w-[1400px] mx-auto border-t border-zinc-900 flex flex-col md:flex-row items-center justify-between gap-6 text-sm">
+        <div className="flex items-center gap-3">
+          <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+          <span className="font-semibold text-zinc-100 tracking-tight text-[15px]">LaunchWise AI</span>
+        </div>
+        <div className="flex items-center gap-8 text-zinc-500 font-light">
+          <span className="hover:text-zinc-300 transition-colors cursor-default tracking-wide">Google Hackathon 2026</span>
+          <a href="https://github.com/launchwise" target="_blank" rel="noreferrer" className="hover:text-zinc-300 transition-colors tracking-wide">GitHub</a>
+          <span className="hover:text-zinc-300 transition-colors cursor-default tracking-wide">Decision Intelligence</span>
+        </div>
+      </footer>
     </div>
   )
 }

@@ -232,9 +232,9 @@ export default function LocationPicker({ initialQuery = '', initialLocation = nu
   // ── Fallback: no API key configured ───────────────────────────────────────
   if (sdkState === 'no-key') {
     return (
-      <div className="rounded-2xl border border-white/8 bg-navy-800/40 p-6 flex flex-col items-center text-center gap-2">
-        <MapPin size={26} className="text-slate-600" />
-        <p className="text-slate-400 text-sm max-w-sm">
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 flex flex-col items-center text-center gap-2 backdrop-blur-xl">
+        <MapPin size={26} className="text-zinc-600" />
+        <p className="text-zinc-400 text-sm max-w-sm">
           The interactive map isn't configured for this environment. You can still type
           the location in the field below.
         </p>
@@ -247,7 +247,7 @@ export default function LocationPicker({ initialQuery = '', initialLocation = nu
             place_id: '', locality: '', city: '', state: '', country: '', postal_code: '',
             free_text: e.target.value,
           })}
-          className="w-full mt-2 bg-navy-800 border border-white/8 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-gold-500/50 text-sm"
+          className="w-full mt-2 bg-zinc-950/50 border border-zinc-800 rounded-xl px-4 py-3 text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-600 transition-colors text-sm"
         />
       </div>
     )
@@ -256,15 +256,15 @@ export default function LocationPicker({ initialQuery = '', initialLocation = nu
   // ── Fallback: SDK failed to load (network / key rejected) ─────────────────
   if (sdkState === 'error') {
     return (
-      <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-6 flex flex-col items-center text-center gap-3">
-        <AlertTriangle size={26} className="text-red-400" />
+      <div className="rounded-2xl border border-red-900/50 bg-red-950/20 p-6 flex flex-col items-center text-center gap-3 backdrop-blur-xl">
+        <AlertTriangle size={26} className="text-red-400/80" />
         <div>
-          <p className="text-slate-200 text-sm font-medium">Couldn't load Google Maps</p>
-          <p className="text-slate-500 text-xs mt-1 max-w-sm">{loadError}</p>
+          <p className="text-zinc-200 text-sm font-medium">Couldn't load Google Maps</p>
+          <p className="text-zinc-500 text-xs mt-1 max-w-sm">{loadError}</p>
         </div>
         <button
           onClick={handleRetryLoad}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-medium transition-colors"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 text-zinc-300 text-xs font-medium transition-colors"
         >
           <RefreshCw size={13} /> Retry
         </button>
@@ -280,23 +280,23 @@ export default function LocationPicker({ initialQuery = '', initialLocation = nu
           rather than a plain <input> we control directly. */}
       <div
         ref={searchContainerRef}
-        className="lw-place-autocomplete-container rounded-xl overflow-hidden border border-white/8 focus-within:border-gold-500/50 transition-colors"
+        className="lw-place-autocomplete-container rounded-xl overflow-hidden border border-zinc-800 focus-within:border-zinc-500 transition-colors bg-zinc-900/50"
       />
       {sdkState === 'ready' && !window.google?.maps?.places?.PlaceAutocompleteElement && (
-        <p className="text-amber-400/70 text-xs -mt-1">
+        <p className="text-zinc-500 text-xs -mt-1">
           Search is unavailable in this browser session — use the map directly instead.
         </p>
       )}
 
       {/* Map */}
-      <div className="relative rounded-2xl overflow-hidden border border-white/8">
-        <div ref={mapDivRef} className="w-full h-[320px] bg-navy-800" />
+      <div className="relative rounded-2xl overflow-hidden border border-zinc-800">
+        <div ref={mapDivRef} className="w-full h-[320px] bg-zinc-950" />
 
         {sdkState === 'loading' && (
-          <div className="absolute inset-0 flex items-center justify-center bg-navy-800/80 backdrop-blur-sm">
+          <div className="absolute inset-0 flex items-center justify-center bg-zinc-950/80 backdrop-blur-md">
             <div className="flex flex-col items-center gap-2">
-              <Loader2 size={24} className="text-gold-400 animate-spin" />
-              <p className="text-slate-400 text-xs">Loading map…</p>
+              <Loader2 size={24} className="text-zinc-400 animate-spin" />
+              <p className="text-zinc-500 text-xs tracking-widest uppercase font-mono">Syncing Map...</p>
             </div>
           </div>
         )}
@@ -307,7 +307,7 @@ export default function LocationPicker({ initialQuery = '', initialLocation = nu
             onClick={handleUseCurrentLocation}
             disabled={locating}
             title="Use current location"
-            className="absolute bottom-4 right-4 w-10 h-10 rounded-full glass border border-white/10 flex items-center justify-center text-gold-400 hover:bg-white/10 transition-colors shadow-lg disabled:opacity-50"
+            className="absolute bottom-4 right-4 w-10 h-10 rounded-full bg-zinc-900/80 backdrop-blur-md border border-zinc-700 flex items-center justify-center text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors shadow-xl disabled:opacity-50"
           >
             {locating ? <Loader2 size={16} className="animate-spin" /> : <Crosshair size={16} />}
           </button>
@@ -315,8 +315,8 @@ export default function LocationPicker({ initialQuery = '', initialLocation = nu
 
         {/* Center pin hint while resolving */}
         {resolving && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full glass border border-white/10 text-xs text-slate-300 flex items-center gap-1.5">
-            <Loader2 size={11} className="animate-spin" /> Locating address…
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-zinc-900/80 backdrop-blur-md border border-zinc-700 text-xs text-zinc-300 flex items-center gap-2 shadow-xl">
+            <Loader2 size={12} className="animate-spin text-zinc-400" /> Resolving Coordinates...
           </div>
         )}
       </div>
@@ -324,53 +324,53 @@ export default function LocationPicker({ initialQuery = '', initialLocation = nu
       {/* Selected location preview card */}
       {selected && (
         <div className={[
-          'rounded-xl border p-4 flex flex-col gap-3 transition-all duration-300',
-          confirmed ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-white/8 bg-navy-800/40',
+          'rounded-2xl border p-5 flex flex-col gap-4 transition-all duration-300 backdrop-blur-xl shadow-2xl',
+          confirmed ? 'border-zinc-700/50 bg-zinc-800/30' : 'border-zinc-800 bg-zinc-900/50',
         ].join(' ')}>
-          <div className="flex items-start gap-3">
-            <MapPin size={16} className={confirmed ? 'text-emerald-400 flex-shrink-0 mt-0.5' : 'text-gold-400 flex-shrink-0 mt-0.5'} />
+          <div className="flex items-start gap-4">
+            <MapPin size={18} className={confirmed ? 'text-zinc-400 flex-shrink-0 mt-0.5' : 'text-zinc-100 flex-shrink-0 mt-0.5'} />
             <div className="flex-1 min-w-0">
-              <p className="text-slate-100 text-sm font-medium leading-snug">
+              <p className="text-zinc-100 text-sm font-medium leading-snug tracking-wide">
                 {selected.formatted_address || 'Selected location'}
               </p>
-              <p className="text-slate-500 text-xs mt-1">
+              <p className="text-zinc-500 text-xs mt-1.5 font-light">
                 {[selected.locality, selected.city, selected.state].filter(Boolean).join(', ') || '—'}
                 {selected.postal_code ? ` · ${selected.postal_code}` : ''}
               </p>
-              <p className="text-slate-600 text-xs mt-1 font-mono">
-                {selected.latitude?.toFixed(5)}, {selected.longitude?.toFixed(5)}
+              <p className="text-zinc-600 text-[10px] mt-2 font-mono uppercase tracking-widest">
+                COORD: {selected.latitude?.toFixed(5)}, {selected.longitude?.toFixed(5)}
               </p>
             </div>
-            {confirmed && <CheckCircle2 size={18} className="text-emerald-400 flex-shrink-0" />}
+            {confirmed && <CheckCircle2 size={20} className="text-zinc-500 flex-shrink-0" />}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <button
               onClick={handleConfirm}
               disabled={confirmed}
               className={[
-                'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all',
+                'flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm transition-all',
                 confirmed
-                  ? 'bg-emerald-500/15 text-emerald-400 cursor-default'
-                  : 'bg-gold-gradient text-navy-900 hover:shadow-lg hover:shadow-gold-500/20 hover:scale-[1.01] active:scale-100',
+                  ? 'bg-zinc-800/50 text-zinc-500 cursor-default border border-zinc-700/50'
+                  : 'bg-zinc-100 text-black hover:bg-white hover:scale-[1.02] active:scale-100 shadow-xl shadow-black/20',
               ].join(' ')}
             >
-              {confirmed ? (<><CheckCircle2 size={15} /> Location Confirmed</>) : 'Confirm Location'}
+              {confirmed ? (<><CheckCircle2 size={16} /> Location Confirmed</>) : 'Confirm Location'}
             </button>
             <a
               href={openInMapsUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-slate-200 text-xs font-medium transition-colors flex-shrink-0"
+              className="flex items-center gap-1.5 px-4 py-3 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 text-xs font-medium transition-colors flex-shrink-0"
             >
-              <ExternalLink size={13} />
+              <ExternalLink size={16} />
             </a>
           </div>
         </div>
       )}
 
       {!selected && sdkState === 'ready' && (
-        <p className="text-slate-600 text-xs text-center">
+        <p className="text-zinc-600 text-xs text-center font-light mt-2">
           Search above, click anywhere on the map, or drag the pin to choose your exact location.
         </p>
       )}

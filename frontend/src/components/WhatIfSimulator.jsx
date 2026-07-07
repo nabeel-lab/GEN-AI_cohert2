@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Sliders, TrendingUp } from 'lucide-react'
+import { Sliders, X } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 export default function WhatIfSimulator({ report, onResult }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -32,109 +33,111 @@ export default function WhatIfSimulator({ report, onResult }) {
     }
   }
 
-  const verdictColor = {
-    GO: 'text-emerald-400',
-    'NO GO': 'text-red-400',
-    'PROCEED WITH CAUTION': 'text-gold-400',
-  }
-
   return (
-    <div className="fixed bottom-6 right-6 z-40 w-96 max-w-[calc(100vw-3rem)]">
-      {/* Collapsed button */}
-      {!isOpen && (
-        <button
-          onClick={() => setIsOpen(true)}
-          className="flex items-center gap-2 px-4 py-3 rounded-xl glass border border-gold-500/30 hover:border-gold-500/50 text-gold-400 font-semibold text-sm transition-all hover:bg-gold-500/10"
-        >
-          <Sliders size={16} />
-          What-If Simulator
-        </button>
-      )}
-
-      {/* Expanded panel */}
-      {isOpen && (
-        <div className="glass rounded-2xl p-6 border border-white/10 shadow-2xl animate-fade-in-up">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Sliders size={16} className="text-gold-400" />
-              <h3 className="font-bold">What-If Simulator</h3>
-            </div>
-            <button onClick={() => setIsOpen(false)} className="text-slate-500 hover:text-slate-100 text-xl">×</button>
-          </div>
-
-          <div className="space-y-4 max-h-80 overflow-y-auto">
-            {/* Budget slider */}
-            <div>
-              <label className="text-xs text-slate-400 block mb-2">
-                Budget: <span className="text-slate-200 font-semibold">₹{(budget / 100000).toFixed(1)}L</span>
-              </label>
-              <input
-                type="range"
-                min={500000}
-                max={5000000}
-                step={100000}
-                value={budget}
-                onChange={(e) => setBudget(parseFloat(e.target.value))}
-                className="w-full"
-              />
-            </div>
-
-            {/* Competition density */}
-            <div>
-              <label className="text-xs text-slate-400 block mb-2">
-                Competition Density: <span className="text-slate-200 font-semibold">{competitionDensity}/100</span>
-              </label>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                step={5}
-                value={competitionDensity}
-                onChange={(e) => setCompetitionDensity(parseInt(e.target.value))}
-                className="w-full"
-              />
-            </div>
-
-            {/* Marketing multiplier */}
-            <div>
-              <label className="text-xs text-slate-400 block mb-2">
-                Marketing Spend: <span className="text-slate-200 font-semibold">{(marketingMultiplier * 100).toFixed(0)}%</span>
-              </label>
-              <input
-                type="range"
-                min={0.5}
-                max={2.0}
-                step={0.1}
-                value={marketingMultiplier}
-                onChange={(e) => setMarketingMultiplier(parseFloat(e.target.value))}
-                className="w-full"
-              />
-            </div>
-
-            {/* Rent override */}
-            <div>
-              <label className="text-xs text-slate-400 block mb-2">
-                Monthly Rent (override): <span className="text-slate-200 font-semibold">{rentOverride ? `₹${(rentOverride / 1000).toFixed(0)}K` : 'Default'}</span>
-              </label>
-              <input
-                type="number"
-                placeholder="Leave empty for default"
-                value={rentOverride || ''}
-                onChange={(e) => setRentOverride(e.target.value ? parseFloat(e.target.value) : null)}
-                className="w-full px-3 py-2 rounded-lg bg-navy-700 border border-white/10 text-slate-100 text-sm placeholder-slate-600"
-              />
-            </div>
-          </div>
-
-          <button
-            onClick={runSimulation}
-            disabled={loading}
-            className="w-full mt-4 px-4 py-2 rounded-lg bg-gold-gradient text-navy-900 font-semibold text-sm disabled:opacity-50 transition-all"
+    <div className="fixed bottom-6 right-6 z-40 w-[24rem] max-w-[calc(100vw-3rem)] font-sans">
+      <AnimatePresence>
+        {!isOpen && (
+          <motion.button
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            onClick={() => setIsOpen(true)}
+            className="flex items-center gap-3 px-5 py-3.5 rounded-full border border-zinc-800 bg-zinc-900/80 backdrop-blur-md text-zinc-300 font-medium text-sm transition-all hover:bg-zinc-800 hover:text-white shadow-xl shadow-black/50 ml-auto"
           >
-            {loading ? 'Simulating...' : 'Run Simulation'}
-          </button>
-        </div>
-      )}
+            <Sliders size={16} className="text-zinc-500" />
+            Simulation Engine
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="border border-zinc-800 bg-zinc-900/60 backdrop-blur-2xl rounded-3xl shadow-2xl flex flex-col overflow-hidden"
+          >
+            <div className="flex items-center justify-between px-6 py-5 border-b border-zinc-800/50 bg-zinc-900/40">
+              <div className="flex items-center gap-3">
+                <Sliders size={16} className="text-zinc-500" />
+                <h3 className="font-semibold text-zinc-100 tracking-tight">Simulation Engine</h3>
+              </div>
+              <button onClick={() => setIsOpen(false)} className="text-zinc-500 hover:text-zinc-100 transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-8 max-h-[30rem] overflow-y-auto">
+              
+              {/* Budget slider */}
+              <div className="space-y-3">
+                <label className="flex items-center justify-between text-xs font-mono uppercase tracking-widest text-zinc-500">
+                  <span>Capital Allocation</span>
+                  <span className="text-zinc-200">₹{(budget / 100000).toFixed(1)}L</span>
+                </label>
+                <input
+                  type="range" min={500000} max={5000000} step={100000}
+                  value={budget} onChange={(e) => setBudget(parseFloat(e.target.value))}
+                  className="w-full accent-zinc-400"
+                />
+              </div>
+
+              {/* Competition density */}
+              <div className="space-y-3">
+                <label className="flex items-center justify-between text-xs font-mono uppercase tracking-widest text-zinc-500">
+                  <span>Market Saturation</span>
+                  <span className="text-zinc-200">{competitionDensity}/100</span>
+                </label>
+                <input
+                  type="range" min={0} max={100} step={5}
+                  value={competitionDensity} onChange={(e) => setCompetitionDensity(parseInt(e.target.value))}
+                  className="w-full accent-zinc-400"
+                />
+              </div>
+
+              {/* Marketing multiplier */}
+              <div className="space-y-3">
+                <label className="flex items-center justify-between text-xs font-mono uppercase tracking-widest text-zinc-500">
+                  <span>Acquisition Spend</span>
+                  <span className="text-zinc-200">{(marketingMultiplier * 100).toFixed(0)}%</span>
+                </label>
+                <input
+                  type="range" min={0.5} max={2.0} step={0.1}
+                  value={marketingMultiplier} onChange={(e) => setMarketingMultiplier(parseFloat(e.target.value))}
+                  className="w-full accent-zinc-400"
+                />
+              </div>
+
+              {/* Rent override */}
+              <div className="space-y-3">
+                <label className="flex items-center justify-between text-xs font-mono uppercase tracking-widest text-zinc-500">
+                  <span>Fixed Overhead (Rent)</span>
+                  <span className="text-zinc-200">{rentOverride ? `₹${(rentOverride / 1000).toFixed(0)}K` : 'Auto'}</span>
+                </label>
+                <input
+                  type="number"
+                  placeholder="Leave empty for AI estimated rent"
+                  value={rentOverride || ''}
+                  onChange={(e) => setRentOverride(e.target.value ? parseFloat(e.target.value) : null)}
+                  className="w-full px-4 py-3 rounded-xl bg-zinc-950/50 border border-zinc-800 text-zinc-100 text-sm placeholder-zinc-700 focus:outline-none focus:border-zinc-600 transition-colors"
+                />
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-zinc-800/50 bg-zinc-900/40">
+              <button
+                onClick={runSimulation}
+                disabled={loading}
+                className="w-full px-4 py-3 rounded-xl bg-zinc-100 text-black font-semibold text-sm disabled:opacity-50 hover:bg-white hover:scale-[1.02] transition-all"
+              >
+                {loading ? 'Processing Scenario...' : 'Execute Protocol'}
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

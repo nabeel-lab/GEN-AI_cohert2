@@ -61,3 +61,7 @@ desktop.ini
 backend/temp_reports/
 backend/sessions/
 backend/uploads/
+
+# ── Local-only archives / delivery artifacts (kept on disk, not versioned) ───
+frontend_legacy_v1/
+LaunchWise_Frontend_UI_v1.0.zip
