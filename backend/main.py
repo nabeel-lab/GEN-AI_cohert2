@@ -591,4 +591,16 @@ def test_full_pipeline():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    # Honor PORT/HOST from .env (documented in .env.example) instead of
+    # hardcoding — matters when running `python main.py` directly rather
+    # than `uvicorn main:app --port X` on the CLI.
+    run_host = os.getenv("HOST", "0.0.0.0")
+    run_port = int(os.getenv("PORT", "8000"))
+    # reload_excludes: without this, every /analyze call writes a new
+    # PDF/JSON into sessions/ (and every /upload-data writes into uploads/),
+    # which the file watcher sees as a source change and restarts the whole
+    # server mid-request. These are runtime data dirs, not source code.
+    uvicorn.run(
+        "main:app", host=run_host, port=run_port, reload=True,
+        reload_excludes=["sessions/*", "uploads/*"],
+    )

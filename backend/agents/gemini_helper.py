@@ -41,26 +41,35 @@ def call_gemini_json(prompt: str, mock_fallback: dict, enable_search: bool = Fal
         print("Using mock fallback (GEMINI_API_KEY not configured).")
         return mock_fallback
 
+    generation_config = {
+        "response_mime_type": "application/json",
+        "temperature": 0.2
+    }
+
+    def _generate(use_search: bool):
+        # Google Search grounding tool — the installed google-generativeai==0.7.2
+        # SDK's Tool proto only exposes `function_declarations`/`code_execution`
+        # (verified via glm.Tool()); it has no `google_search_retrieval` field,
+        # so passing it always raises "Unknown field for FunctionDeclaration".
+        # Grounding requires either upgrading to a newer SDK/tool schema, or
+        # Vertex AI — out of scope for a same-behavior fix. We still attempt it
+        # (in case a future SDK bump adds support) but always have a fallback.
+        tools = [{"google_search_retrieval": {}}] if use_search else None
+        model = genai.GenerativeModel(model_name="gemini-1.5-flash", tools=tools)
+        response = model.generate_content(prompt, generation_config=generation_config)
+        return response.text.strip()
+
     try:
-        # Google Search grounding — uses legacy SDK tool format for google-generativeai 0.7.x
-        tools = [{"google_search_retrieval": {}}] if enable_search else None
-
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
-            tools=tools
-        )
-
-        generation_config = {
-            "response_mime_type": "application/json",
-            "temperature": 0.2
-        }
-
-        response = model.generate_content(
-            prompt,
-            generation_config=generation_config
-        )
-
-        text_content = response.text.strip()
+        try:
+            text_content = _generate(enable_search)
+        except Exception as tool_err:
+            if enable_search:
+                # Grounding tool rejected by this SDK — retry without it so the
+                # call still gets a live Gemini answer instead of a full mock.
+                print(f"Gemini search-grounding unavailable on this SDK, retrying without it. Reason: {tool_err}")
+                text_content = _generate(False)
+            else:
+                raise
 
         # Strip markdown code fences if the model wrapped the JSON
         if text_content.startswith("```json"):
