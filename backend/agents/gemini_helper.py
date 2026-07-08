@@ -38,13 +38,45 @@ def _is_rate_limit_error(error: Exception) -> bool:
     return "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
 
 
+def _is_billing_exhausted_error(error: Exception) -> bool:
+    """
+    Distinguishes a PERMANENT billing wall (prepayment credits depleted / no
+    quota on this plan) from a TRANSIENT per-minute rate limit. Google returns
+    429 RESOURCE_EXHAUSTED for both, but only the transient case is worth an
+    exponential-backoff retry — retrying a depleted-credits error just burns
+    ~75s per call (5+10+20+40) for a request that can never succeed until the
+    account is topped up. Detected once per process and cached so every
+    subsequent agent call in the same run skips retries immediately instead
+    of re-discovering the same permanent failure one at a time.
+    """
+    err_str = str(error).lower()
+    return any(phrase in err_str for phrase in (
+        "prepayment credits are depleted",
+        "exceeded your current quota",
+        "check your plan and billing",
+    ))
+
+
+# Set once a billing-exhausted error is seen — every other agent call in this
+# process then skips the retry ladder immediately instead of independently
+# rediscovering the same permanent failure through a full 75s backoff each.
+_billing_exhausted_seen = False
+
+
 def _generate_with_retry(prompt: str, generation_config, attempt_label: str = "") -> str:
     """
     Internal helper: calls Gemini with automatic exponential-backoff retry
-    on 429 rate-limit errors. Returns the raw text response.
+    on transient 429 rate-limit errors. Returns the raw text response.
+
+    Does NOT retry a billing/quota-exhausted 429 (depleted prepayment credits,
+    plan quota exceeded) — that's a permanent wall, not a transient limit, so
+    retrying it just burns ~75s per call for a request that can never succeed
+    until the account is topped up. Fails fast to mock fallback instead.
     """
+    global _billing_exhausted_seen
     last_err = None
-    for attempt in range(1, MAX_RETRIES + 2):   # +2 because range is exclusive and we start at 1
+    max_attempts = 1 if _billing_exhausted_seen else MAX_RETRIES + 1
+    for attempt in range(1, max_attempts + 1):
         try:
             response = client.models.generate_content(
                 model="gemini-2.5-flash",
@@ -54,6 +86,14 @@ def _generate_with_retry(prompt: str, generation_config, attempt_label: str = ""
             return response.text.strip()
         except Exception as e:
             last_err = e
+            if _is_billing_exhausted_error(e):
+                if not _billing_exhausted_seen:
+                    logger.error(
+                        f"[Gemini] Billing/quota exhausted — will skip retries for the "
+                        f"rest of this run. Add credits at https://ai.studio/projects. Error: {e}"
+                    )
+                _billing_exhausted_seen = True
+                raise
             if _is_rate_limit_error(e) and attempt <= MAX_RETRIES:
                 wait = INITIAL_BACKOFF_SEC * (2 ** (attempt - 1))  # 5, 10, 20, 40
                 logger.warning(

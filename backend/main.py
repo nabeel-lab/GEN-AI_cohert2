@@ -660,9 +660,13 @@ if __name__ == "__main__":
     run_port = int(os.getenv("PORT", "8000"))
     # reload_excludes: without this, every /analyze call writes a new
     # PDF/JSON into sessions/ (and every /upload-data writes into uploads/),
-    # which the file watcher sees as a source change and restarts the whole
-    # server mid-request. These are runtime data dirs, not source code.
+    # and every successful analysis commits a row to launchwise.db (SQLite) —
+    # the file watcher sees each of these as a source change and restarts the
+    # whole server mid-request, dropping the in-flight response and making
+    # the very next GET /report/{id} fail with "No Report Available" even
+    # though the report was generated and saved successfully. These are
+    # runtime data files, not source code.
     uvicorn.run(
         "main:app", host=run_host, port=run_port, reload=True,
-        reload_excludes=["sessions/*", "uploads/*"],
+        reload_excludes=["sessions/*", "uploads/*", "launchwise.db", "launchwise.db-*"],
     )
