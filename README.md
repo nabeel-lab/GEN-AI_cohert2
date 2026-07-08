@@ -287,7 +287,7 @@ All endpoints except `/health` and the demo-report path expect a `Bearer` token 
 ## Contributors
 
 - Saad Riyaz Mohammed ([@saad-46](https://github.com/saad-46))
-- Nabeel
+- Mohammed Nabeeluddin ([@nabeel-lab](https://github.com/nabeel-lab))
 
 ---
 
