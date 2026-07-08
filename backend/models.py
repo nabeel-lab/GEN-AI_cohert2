@@ -173,9 +173,14 @@ class SimulationResult(BaseModel):
 
 
 # --- AI Chat Assistant ---
+class ChatMessage(BaseModel):
+    role: str
+    text: str
+
 class ChatRequest(BaseModel):
     session_id: str
     question: str = Field(..., min_length=1, max_length=500)
+    history: List[ChatMessage] = []
 
 
 class ChatResponse(BaseModel):
@@ -193,3 +198,23 @@ class DatasetKPIReport(BaseModel):
     kpis: Dict[str, float]
     gpu_accelerated: bool
     bigquery_synced: bool
+
+
+# --- Strategic AI Consultant ---
+class Message(BaseModel):
+    role: str
+    text: str
+
+class ConsultRequest(BaseModel):
+    messages: List[Message]
+
+class ExtractedParams(BaseModel):
+    business_type: Optional[str] = None
+    location: Optional[str] = None
+    budget: Optional[float] = None
+    description: Optional[str] = None
+
+class ConsultResponse(BaseModel):
+    reply: str
+    is_ready_for_analysis: bool = False
+    extracted_params: Optional[ExtractedParams] = None

@@ -13,9 +13,13 @@ export default function WhatIfSimulator({ report, onResult }) {
   async function runSimulation() {
     setLoading(true)
     try {
-      const res = await fetch(`/api/simulate`, {
+      const token = localStorage.getItem('lw_token')
+      const res = await fetch(`http://localhost:8000/simulate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           session_id: report.session_id,
           budget,

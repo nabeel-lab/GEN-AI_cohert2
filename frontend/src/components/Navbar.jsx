@@ -1,20 +1,21 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, useScroll, useMotionValueEvent } from 'framer-motion'
+import { useAuth } from '../context/AuthContext'
 
 const NAV_LINKS = [
   { path: '/', label: 'Home' },
-  { path: '/analyze', label: 'Analyze' },
+  { path: '/projects', label: 'Projects' },
   { path: '/consultant', label: 'AI Consultant' },
-  { path: '/analytics', label: 'Analytics' },
-  { path: '/guide', label: 'User Guide' },
 ]
 
 export default function Navbar() {
   const { pathname } = useLocation()
+  const navigate = useNavigate()
   const { scrollY } = useScroll()
   const [hidden, setHidden] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
+  const { user, logout } = useAuth()
 
   useMotionValueEvent(scrollY, 'change', (latest) => {
     const previous = scrollY.getPrevious()
@@ -70,6 +71,27 @@ export default function Navbar() {
             </Link>
           )
         })}
+      </div>
+
+      <div className="flex items-center gap-2 ml-4">
+        {user ? (
+          <div className="flex items-center gap-4">
+            <span className="text-[12px] text-zinc-400 font-mono hidden sm:inline-block">{user.email}</span>
+            <button 
+              onClick={() => { logout(); navigate('/'); }}
+              className="px-4 py-1.5 rounded-full border border-zinc-700 hover:bg-zinc-800 text-[12px] font-medium text-zinc-300 transition-colors"
+            >
+              Sign Out
+            </button>
+          </div>
+        ) : (
+          <Link
+            to="/login"
+            className="px-4 py-1.5 rounded-full bg-zinc-100 hover:bg-white text-black text-[12px] font-medium transition-colors"
+          >
+            Sign In
+          </Link>
+        )}
       </div>
     </motion.nav>
   )

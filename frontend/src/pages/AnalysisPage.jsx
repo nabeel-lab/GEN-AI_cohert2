@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft, ArrowRight, ChevronRight,
@@ -58,9 +58,36 @@ function formatBudget(val) {
 // ── Component ──────────────────────────────────────────────────────────────
 export default function AnalysisPage() {
   const navigate = useNavigate()
+  const { projectId } = useParams()
 
   const [currentStep, setCurrentStep] = useState(0)
   const [answers, setAnswers]         = useState({ business_type: '', location: '', budget: '', description: '' })
+
+  // Initialize with existing project data if available
+  useEffect(() => {
+    if (projectId) {
+      const stored = localStorage.getItem('lw_projects')
+      if (stored) {
+        try {
+          const projects = JSON.parse(stored)
+          const proj = projects.find(p => p.id === projectId)
+          if (proj) {
+            // First check if we have answers explicitly saved (from AI consultant), otherwise fallback to the report request
+            const prev = proj.answers || proj.report?.request
+            if (prev) {
+              setAnswers({
+                business_type: prev.business_type || '',
+                location: prev.location || '',
+                budget: prev.budget?.toString() || '',
+                description: prev.description || ''
+              })
+              setInputVal(prev.business_type || '')
+            }
+          }
+        } catch (e) {}
+      }
+    }
+  }, [projectId])
   const [inputVal, setInputVal]       = useState('')
   const [locationData, setLocationData] = useState(null)
   const [error, setError]             = useState('')
@@ -109,8 +136,9 @@ export default function AnalysisPage() {
     setAnswers(newAnswers)
 
     if (currentStep < STEPS.length - 1) {
-      setCurrentStep((s) => s + 1)
-      setInputVal('')
+      const nextStep = currentStep + 1
+      setCurrentStep(nextStep)
+      setInputVal(newAnswers[STEPS[nextStep].id] || '')
     } else {
       startAnalysis(newAnswers)
     }
@@ -153,9 +181,13 @@ export default function AnalysisPage() {
         } : {}),
       }
 
-      const res = await fetch('/api/analyze', {
+      const token = localStorage.getItem('lw_token')
+      const res = await fetch('http://localhost:8000/analyze', {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body:    JSON.stringify(payload),
       })
 
@@ -165,7 +197,17 @@ export default function AnalysisPage() {
       }
 
       const report = await res.json()
+      
+      const stored = localStorage.getItem('lw_projects')
+      if (stored) {
+        try {
+          const projects = JSON.parse(stored)
+          const updated = projects.map(p => p.id === projectId ? { ...p, report } : p)
+          localStorage.setItem('lw_projects', JSON.stringify(updated))
+        } catch(e) {}
+      }
       sessionStorage.setItem('lw_report', JSON.stringify(report))
+      
       setPhase('done')
     } catch (err) {
       console.error('Analysis failed:', err)
@@ -195,9 +237,9 @@ export default function AnalysisPage() {
     setAnimDone(true)
   }, [])
 
-  useEffect(() => {
-    if (phase === 'done' && animDone) navigate('/results')
-  }, [phase, animDone, navigate])
+  const handleProceed = useCallback(() => {
+    navigate(`/results/${projectId || ''}`)
+  }, [navigate, projectId])
 
   return (
     <div className="min-h-screen bg-background text-zinc-100 flex flex-col relative overflow-hidden font-sans">
@@ -442,6 +484,8 @@ export default function AnalysisPage() {
         <div className="lg:w-96 flex-shrink-0 relative z-20">
           <AgentStatusPanel
             isRunning={phase === 'analyzing' || phase === 'done'}
+            isDataReady={phase === 'done'}
+            onProceed={handleProceed}
             onComplete={handleAgentsComplete}
           />
         </div>

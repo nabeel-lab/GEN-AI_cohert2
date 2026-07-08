@@ -1,33 +1,20 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import {
-  Crosshair, MapPin, CheckCircle2, RefreshCw, AlertTriangle, ExternalLink, Loader2,
+  Crosshair, MapPin, CheckCircle2, RefreshCw, AlertTriangle, ExternalLink, Loader2, Search,
 } from 'lucide-react'
 import {
-  loadGoogleMaps, hasMapsApiKey, parseAddressComponents, parseNewPlaceAddressComponents, DARK_MAP_STYLE,
+  loadGoogleMaps, hasMapsApiKey, parseAddressComponents, DARK_MAP_STYLE,
 } from '../lib/googleMaps'
 
-// Default center: Bangalore (MG Road) — sensible starting point for this
-// India-focused product when no location has been picked yet.
+// Default center: Bangalore (MG Road)
 const DEFAULT_CENTER = { lat: 12.9738, lng: 77.6119 }
 
-/**
- * Uber-style interactive location picker.
- *
- * Uses Maps JavaScript API (map + draggable marker), Places API (New) via
- * the classic Autocomplete widget (search bar), and Geocoding API (reverse
- * geocoding on click / drag / current-location).
- *
- * Calls onChange(locationData | null) every time the confirmed selection
- * changes. locationData shape matches the backend AnalysisRequest extension:
- * { latitude, longitude, formatted_address, place_id, locality, city, state, country, postal_code }
- */
 export default function LocationPicker({ initialQuery = '', initialLocation = null, onChange }) {
   const mapDivRef = useRef(null)
-  const searchContainerRef = useRef(null)
   const mapRef = useRef(null)
   const markerRef = useRef(null)
   const geocoderRef = useRef(null)
-  const autocompleteRef = useRef(null)
+  const autocompleteServiceRef = useRef(null)
 
   const [sdkState, setSdkState] = useState('loading') // loading | ready | error | no-key
   const [loadError, setLoadError] = useState('')
@@ -35,6 +22,18 @@ export default function LocationPicker({ initialQuery = '', initialLocation = nu
   const [selected, setSelected] = useState(initialLocation) // parsed location object
   const [confirmed, setConfirmed] = useState(Boolean(initialLocation))
   const [locating, setLocating] = useState(false)
+
+  // Autocomplete UI States
+  const [searchQuery, setSearchQuery] = useState(initialLocation?.formatted_address || initialQuery)
+  const [predictions, setPredictions] = useState([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+
+  // Close suggestions dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setShowSuggestions(false)
+    window.addEventListener('click', handleClickOutside)
+    return () => window.removeEventListener('click', handleClickOutside)
+  }, [])
 
   // ── Reverse-geocode a lat/lng and update state + marker ──────────────────
   const resolveLatLng = useCallback((lat, lng, animateDrop = false) => {
@@ -47,15 +46,15 @@ export default function LocationPicker({ initialQuery = '', initialLocation = nu
       setResolving(false)
 
       if (status !== 'OK' || !results || !results[0]) {
-        // Geocoding failed but we still have a valid pin — degrade gracefully
-        // rather than losing the selection entirely.
+        const fallbackAddress = `${lat.toFixed(5)}, ${lng.toFixed(5)}`
         setSelected({
           latitude: lat,
           longitude: lng,
-          formatted_address: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+          formatted_address: fallbackAddress,
           place_id: '',
           locality: '', city: '', state: '', country: '', postal_code: '',
         })
+        setSearchQuery(fallbackAddress)
         return
       }
 
@@ -68,6 +67,7 @@ export default function LocationPicker({ initialQuery = '', initialLocation = nu
         place_id: best.place_id || '',
         ...parsed,
       })
+      setSearchQuery(best.formatted_address)
     })
 
     if (markerRef.current) {
@@ -124,50 +124,12 @@ export default function LocationPicker({ initialQuery = '', initialLocation = nu
         markerRef.current = marker
         geocoderRef.current = new window.google.maps.Geocoder()
 
-        // Search bar → Places API (New) Autocomplete Element. The legacy
-        // `google.maps.places.Autocomplete` widget is blocked on API keys/
-        // projects provisioned after March 2025 (ApiTargetBlockedMapError) —
-        // PlaceAutocompleteElement is the current, supported replacement and
-        // is what "Places API (New)" actually refers to.
-        if (searchContainerRef.current && window.google.maps.places.PlaceAutocompleteElement) {
-          searchContainerRef.current.innerHTML = ''
-          const autocompleteEl = new window.google.maps.places.PlaceAutocompleteElement({
-            includedRegionCodes: ['in'],
-          })
-          autocompleteEl.classList.add('lw-place-autocomplete')
-          searchContainerRef.current.appendChild(autocompleteEl)
-
-          autocompleteEl.addEventListener('gmp-select', async ({ placePrediction }) => {
-            const place = placePrediction.toPlace()
-            await place.fetchFields({ fields: ['location', 'formattedAddress', 'addressComponents', 'id'] })
-            if (!place.location) return
-
-            const lat = place.location.lat()
-            const lng = place.location.lng()
-            map.setZoom(16)
-
-            const parsed = parseNewPlaceAddressComponents(place.addressComponents || [])
-            setSelected({
-              latitude: lat,
-              longitude: lng,
-              formatted_address: place.formattedAddress || '',
-              place_id: place.id || '',
-              ...parsed,
-            })
-            marker.setPosition({ lat, lng })
-            marker.setAnimation(window.google.maps.Animation.DROP)
-            map.panTo({ lat, lng })
-            setConfirmed(false)
-          })
-
-          autocompleteRef.current = autocompleteEl
+        // Initialize programmatic AutocompleteService
+        if (window.google.maps.places) {
+          autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService()
         }
 
-        // If the wizard already has a confirmed pick (user hit "Back" and
-        // returned to this step), we've already centered/marked it above —
-        // nothing further to resolve. Otherwise, if there's just a free-text
-        // location string from an earlier version of this step, prime the
-        // map there via a one-off geocode.
+        // Prime the map with initial query if no coordinates are provided
         if (!initialLocation && initialQuery) {
           geocoderRef.current.geocode({ address: `${initialQuery}, India` }, (results, status) => {
             if (status === 'OK' && results && results[0]) {
@@ -190,13 +152,127 @@ export default function LocationPicker({ initialQuery = '', initialLocation = nu
 
     return () => {
       cancelled = true
-      // Guards against React StrictMode's double-invoke in dev, which would
-      // otherwise append a second PlaceAutocompleteElement into the same
-      // container on remount.
-      if (searchContainerRef.current) searchContainerRef.current.innerHTML = ''
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // ── Handle programmatic search autocomplete ────────────────────────────────
+  const handleSearchChange = (val) => {
+    setSearchQuery(val)
+    setConfirmed(false)
+    if (!val.trim()) {
+      setPredictions([])
+      setShowSuggestions(false)
+      return
+    }
+
+    if (autocompleteServiceRef.current) {
+      autocompleteServiceRef.current.getPlacePredictions(
+        { input: val, componentRestrictions: { country: 'in' } },
+        (results, status) => {
+          if (status === 'OK' && results) {
+            setPredictions(results)
+            setShowSuggestions(true)
+          } else {
+            setPredictions([])
+          }
+        }
+      )
+    }
+  }
+
+  // ── Select a prediction from dropdown list ─────────────────────────────────
+  const handleSelectPrediction = (prediction) => {
+    setSearchQuery(prediction.description)
+    setShowSuggestions(false)
+    setConfirmed(false)
+
+    if (geocoderRef.current) {
+      setResolving(true)
+      geocoderRef.current.geocode({ placeId: prediction.place_id }, (results, status) => {
+        setResolving(false)
+        if (status === 'OK' && results && results[0]) {
+          const best = results[0]
+          const lat = best.geometry.location.lat()
+          const lng = best.geometry.location.lng()
+          const parsed = parseAddressComponents(best.address_components)
+          
+          setSelected({
+            latitude: lat,
+            longitude: lng,
+            formatted_address: best.formatted_address,
+            place_id: prediction.place_id || '',
+            ...parsed,
+          })
+
+          if (markerRef.current) {
+            markerRef.current.setPosition({ lat, lng })
+            markerRef.current.setAnimation(window.google.maps.Animation.DROP)
+          }
+          if (mapRef.current) {
+            mapRef.current.panTo({ lat, lng })
+            mapRef.current.setZoom(16)
+          }
+        }
+      })
+    }
+  }
+
+  // ── Geocode custom typed address or fallback to free text ───────────────────
+  const handleGeocodeFreeText = () => {
+    if (!searchQuery.trim()) return
+    setConfirmed(false)
+
+    if (geocoderRef.current) {
+      setResolving(true)
+      geocoderRef.current.geocode({ address: `${searchQuery}, India` }, (results, status) => {
+        setResolving(false)
+        if (status === 'OK' && results && results[0]) {
+          const best = results[0]
+          const lat = best.geometry.location.lat()
+          const lng = best.geometry.location.lng()
+          const parsed = parseAddressComponents(best.address_components)
+
+          setSelected({
+            latitude: lat,
+            longitude: lng,
+            formatted_address: best.formatted_address,
+            place_id: best.place_id || '',
+            ...parsed,
+          })
+
+          if (markerRef.current) {
+            markerRef.current.setPosition({ lat, lng })
+            markerRef.current.setAnimation(window.google.maps.Animation.DROP)
+          }
+          if (mapRef.current) {
+            mapRef.current.panTo({ lat, lng })
+            mapRef.current.setZoom(16)
+          }
+        } else {
+          // If Geocoder fails (e.g. invalid key, offline, or not found), save query as free_text
+          setSelected({
+            latitude: null,
+            longitude: null,
+            formatted_address: searchQuery,
+            place_id: '',
+            locality: '', city: '', state: '', country: '', postal_code: '',
+            free_text: searchQuery,
+          })
+        }
+      })
+    } else {
+      // Maps not ready, save query as free_text
+      setSelected({
+        latitude: null,
+        longitude: null,
+        formatted_address: searchQuery,
+        place_id: '',
+        locality: '', city: '', state: '', country: '', postal_code: '',
+        free_text: searchQuery,
+      })
+    }
+  }
 
   // ── Current location button ──────────────────────────────────────────────
   function handleUseCurrentLocation() {
@@ -214,7 +290,23 @@ export default function LocationPicker({ initialQuery = '', initialLocation = nu
   }
 
   function handleConfirm() {
-    if (!selected) return
+    if (!selected) {
+      // If nothing selected but searchQuery has text, treat it as custom input
+      if (searchQuery.trim()) {
+        const customLoc = {
+          latitude: null,
+          longitude: null,
+          formatted_address: searchQuery,
+          place_id: '',
+          locality: '', city: '', state: '', country: '', postal_code: '',
+          free_text: searchQuery,
+        }
+        setSelected(customLoc)
+        setConfirmed(true)
+        onChange?.(customLoc)
+      }
+      return
+    }
     setConfirmed(true)
     onChange?.(selected)
   }
@@ -235,25 +327,27 @@ export default function LocationPicker({ initialQuery = '', initialLocation = nu
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 flex flex-col items-center text-center gap-2 backdrop-blur-xl">
         <MapPin size={26} className="text-zinc-600" />
         <p className="text-zinc-400 text-sm max-w-sm">
-          The interactive map isn't configured for this environment. You can still type
-          the location in the field below.
+          Interactive map is not configured. Type your target location directly.
         </p>
         <input
           type="text"
-          placeholder="e.g. Koramangala, Bangalore"
-          defaultValue={initialQuery}
-          onChange={(e) => onChange?.({
-            latitude: null, longitude: null, formatted_address: e.target.value,
-            place_id: '', locality: '', city: '', state: '', country: '', postal_code: '',
-            free_text: e.target.value,
-          })}
+          placeholder="e.g. Banjara Hills, Hyderabad"
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value)
+            onChange?.({
+              latitude: null, longitude: null, formatted_address: e.target.value,
+              place_id: '', locality: '', city: '', state: '', country: '', postal_code: '',
+              free_text: e.target.value,
+            })
+          }}
           className="w-full mt-2 bg-zinc-950/50 border border-zinc-800 rounded-xl px-4 py-3 text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-600 transition-colors text-sm"
         />
       </div>
     )
   }
 
-  // ── Fallback: SDK failed to load (network / key rejected) ─────────────────
+  // ── Fallback: SDK failed to load ─────────────────
   if (sdkState === 'error') {
     return (
       <div className="rounded-2xl border border-red-900/50 bg-red-950/20 p-6 flex flex-col items-center text-center gap-3 backdrop-blur-xl">
@@ -273,20 +367,49 @@ export default function LocationPicker({ initialQuery = '', initialLocation = nu
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      {/* Search bar — hosts the Places API (New) PlaceAutocompleteElement,
-          injected imperatively once the SDK loads (see effect above). It's a
-          shadow-DOM custom element, so it renders its own input + dropdown
-          rather than a plain <input> we control directly. */}
-      <div
-        ref={searchContainerRef}
-        className="lw-place-autocomplete-container rounded-xl overflow-hidden border border-zinc-800 focus-within:border-zinc-500 transition-colors bg-zinc-900/50"
-      />
-      {sdkState === 'ready' && !window.google?.maps?.places?.PlaceAutocompleteElement && (
-        <p className="text-zinc-500 text-xs -mt-1">
-          Search is unavailable in this browser session — use the map directly instead.
-        </p>
-      )}
+    <div className="flex flex-col gap-3 p-3">
+      {/* Autocomplete & Free-text search input */}
+      <div className="relative" onClick={(e) => e.stopPropagation()}>
+        <div className="flex gap-2">
+          <div className="flex-1 relative flex items-center">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleGeocodeFreeText()
+                  setShowSuggestions(false)
+                }
+              }}
+              placeholder="Search or type address (e.g. Banjara Hills, Hyderabad)"
+              className="w-full bg-zinc-950/50 border border-zinc-800 focus:border-zinc-500 rounded-xl pl-10 pr-4 py-3 text-zinc-100 placeholder-zinc-600 focus:outline-none transition-colors text-sm"
+            />
+            <Search size={16} className="absolute left-3.5 text-zinc-600" />
+          </div>
+          <button
+            onClick={handleGeocodeFreeText}
+            className="px-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white rounded-xl text-xs font-semibold border border-zinc-700 transition-colors flex-shrink-0"
+          >
+            Locate
+          </button>
+        </div>
+
+        {/* Suggestion Dropdown */}
+        {showSuggestions && predictions.length > 0 && (
+          <div className="absolute left-0 right-0 mt-1.5 bg-zinc-900 border border-zinc-800 rounded-xl max-h-60 overflow-y-auto z-50 shadow-2xl backdrop-blur-xl">
+            {predictions.map((p) => (
+              <button
+                key={p.place_id}
+                onClick={() => handleSelectPrediction(p)}
+                className="w-full text-left px-4 py-3 hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs border-b border-zinc-800/40 last:border-0 transition-colors truncate"
+              >
+                {p.description}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Map */}
       <div className="relative rounded-2xl overflow-hidden border border-zinc-800">
@@ -301,7 +424,7 @@ export default function LocationPicker({ initialQuery = '', initialLocation = nu
           </div>
         )}
 
-        {/* Floating current-location control (Uber-style FAB) */}
+        {/* Floating current-location FAB */}
         {sdkState === 'ready' && (
           <button
             onClick={handleUseCurrentLocation}
@@ -322,7 +445,7 @@ export default function LocationPicker({ initialQuery = '', initialLocation = nu
       </div>
 
       {/* Selected location preview card */}
-      {selected && (
+      {(selected || searchQuery.trim()) && (
         <div className={[
           'rounded-2xl border p-5 flex flex-col gap-4 transition-all duration-300 backdrop-blur-xl shadow-2xl',
           confirmed ? 'border-zinc-700/50 bg-zinc-800/30' : 'border-zinc-800 bg-zinc-900/50',
@@ -331,15 +454,18 @@ export default function LocationPicker({ initialQuery = '', initialLocation = nu
             <MapPin size={18} className={confirmed ? 'text-zinc-400 flex-shrink-0 mt-0.5' : 'text-zinc-100 flex-shrink-0 mt-0.5'} />
             <div className="flex-1 min-w-0">
               <p className="text-zinc-100 text-sm font-medium leading-snug tracking-wide">
-                {selected.formatted_address || 'Selected location'}
+                {selected?.formatted_address || searchQuery}
               </p>
               <p className="text-zinc-500 text-xs mt-1.5 font-light">
-                {[selected.locality, selected.city, selected.state].filter(Boolean).join(', ') || '—'}
-                {selected.postal_code ? ` · ${selected.postal_code}` : ''}
+                {selected 
+                  ? [selected.locality, selected.city, selected.state].filter(Boolean).join(', ') 
+                  : 'Custom Typed Location (Fallback analysis active)'}
               </p>
-              <p className="text-zinc-600 text-[10px] mt-2 font-mono uppercase tracking-widest">
-                COORD: {selected.latitude?.toFixed(5)}, {selected.longitude?.toFixed(5)}
-              </p>
+              {selected?.latitude != null && (
+                <p className="text-zinc-600 text-[10px] mt-2 font-mono uppercase tracking-widest">
+                  COORD: {selected.latitude.toFixed(5)}, {selected.longitude.toFixed(5)}
+                </p>
+              )}
             </div>
             {confirmed && <CheckCircle2 size={20} className="text-zinc-500 flex-shrink-0" />}
           </div>
@@ -357,21 +483,23 @@ export default function LocationPicker({ initialQuery = '', initialLocation = nu
             >
               {confirmed ? (<><CheckCircle2 size={16} /> Location Confirmed</>) : 'Confirm Location'}
             </button>
-            <a
-              href={openInMapsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-4 py-3 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 text-xs font-medium transition-colors flex-shrink-0"
-            >
-              <ExternalLink size={16} />
-            </a>
+            {selected?.latitude != null && (
+              <a
+                href={openInMapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-4 py-3 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 text-xs font-medium transition-colors flex-shrink-0"
+              >
+                <ExternalLink size={16} />
+              </a>
+            )}
           </div>
         </div>
       )}
 
-      {!selected && sdkState === 'ready' && (
+      {!selected && !searchQuery.trim() && sdkState === 'ready' && (
         <p className="text-zinc-600 text-xs text-center font-light mt-2">
-          Search above, click anywhere on the map, or drag the pin to choose your exact location.
+          Search above, click anywhere on the map, or type a custom location name directly.
         </p>
       )}
     </div>

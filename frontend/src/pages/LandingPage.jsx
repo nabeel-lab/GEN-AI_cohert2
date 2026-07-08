@@ -42,8 +42,20 @@ export default function LandingPage() {
   function loadDemoScenario(scenarioId) {
     const scenario = DEMO_SCENARIOS.find(s => s.id === scenarioId)
     if (scenario) {
+      const demoProject = {
+        id: `demo-${scenarioId}`,
+        name: scenario.label || scenarioId,
+        createdAt: new Date().toISOString(),
+        report: scenario.report,
+      }
+      const stored = localStorage.getItem('lw_projects')
+      let projects = []
+      if (stored) { try { projects = JSON.parse(stored) } catch(e) {} }
+      const existing = projects.findIndex(p => p.id === demoProject.id)
+      if (existing >= 0) { projects[existing] = demoProject } else { projects.unshift(demoProject) }
+      localStorage.setItem('lw_projects', JSON.stringify(projects))
       sessionStorage.setItem('lw_report', JSON.stringify(scenario.report))
-      navigate('/results')
+      navigate(`/results/${demoProject.id}`)
     }
   }
 
@@ -93,10 +105,10 @@ export default function LandingPage() {
               
               <button
                 id="tour-step-cta"
-                onClick={() => navigate('/analyze')}
+                onClick={() => navigate('/projects')}
                 className="tour-step-cta group relative flex items-center justify-between w-full sm:w-auto sm:min-w-[320px] px-8 py-4 bg-zinc-100 text-zinc-900 rounded-full font-semibold text-[15px] hover:bg-white transition-all duration-500 hover:shadow-[0_0_40px_rgba(59,130,246,0.15)] hover:scale-[1.02] active:scale-100"
               >
-                <span className="tracking-tight">Analyze My Business Idea</span>
+                <span className="tracking-tight">View Projects & Analyze</span>
                 <div className="flex items-center gap-3">
                   <span className="text-zinc-400 text-[10px] font-mono hidden sm:block">↵</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-300" />

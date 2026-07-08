@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { MessageCircle, Send, X, Activity } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
-export default function ChatPanel({ sessionId }) {
+export default function ChatPanel({ sessionId, projectId }) {
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState([
     { type: 'assistant', text: 'Ask me anything about this analysis. I\'ll answer based on the actual data.' },
@@ -10,6 +10,23 @@ export default function ChatPanel({ sessionId }) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const messagesEndRef = useRef(null)
+
+  useEffect(() => {
+    if (projectId) {
+      const stored = localStorage.getItem(`lw_chat_${projectId}`)
+      if (stored) {
+        try {
+          setMessages(JSON.parse(stored))
+        } catch (e) {}
+      }
+    }
+  }, [projectId])
+
+  useEffect(() => {
+    if (projectId) {
+      localStorage.setItem(`lw_chat_${projectId}`, JSON.stringify(messages))
+    }
+  }, [messages, projectId])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -24,19 +41,50 @@ export default function ChatPanel({ sessionId }) {
 
     const userMsg = input
     setInput('')
+    
+    // Map current message history before updating local state
+    const history = messages
+      .filter(m => m.text)
+      .map(m => ({
+        role: m.type === 'user' ? 'user' : 'model',
+        text: m.text
+      }))
+
     setMessages((m) => [...m, { type: 'user', text: userMsg }])
     setLoading(true)
 
     try {
-      const res = await fetch(`/api/chat`, {
+      const token = localStorage.getItem('lw_token')
+      const res = await fetch(`http://localhost:8000/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionId, question: userMsg }),
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          session_id: sessionId, 
+          question: userMsg,
+          history: history
+        }),
       })
-      const data = await res.json()
+      
+      const text = await res.text()
+      if (!res.ok) {
+        let errMessage = 'Server error'
+        try { errMessage = JSON.parse(text).detail || text } catch(e) {}
+        throw new Error(errMessage)
+      }
+      
+      const data = JSON.parse(text)
+      if (!data.answer) throw new Error("No answer in response")
+
       setMessages((m) => [...m, { type: 'assistant', text: data.answer }])
     } catch (e) {
-      setMessages((m) => [...m, { type: 'assistant', text: 'Sorry, I couldn\'t process that. Try again.' }])
+      console.error("Chat Error:", e)
+      setMessages((m) => [...m, { 
+        type: 'assistant', 
+        text: `Sorry, I couldn't process that. Error: ${e.message || 'Unknown'}. Please make sure the backend is running.` 
+      }])
     } finally {
       setLoading(false)
     }

@@ -9,6 +9,8 @@ from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import ValidationError
 from typing import List, Dict, Optional
 from dotenv import load_dotenv
+from sqlalchemy.orm import Session
+from fastapi import Depends
 
 # Load .env from project root (one level above backend/)
 _root_env = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env')
@@ -22,8 +24,12 @@ from models import (
     AnalysisRequest, FinalReport, DatasetKPIReport,
     SimulationRequest, SimulationResult, MarketReport, CompetitorReport,
     CustomerPersona, SupplyChainItem, MarketingCampaign, ChatRequest, ChatResponse,
+    ConsultRequest, ConsultResponse,
 )
+
 import agents
+import database
+import auth
 from agents.decision_agent import compute_score_breakdown, compute_health_score, compute_confidence
 import services
 from services.analytics_summary import get_summary as get_analytics_summary
@@ -38,6 +44,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth.router, prefix="/auth")
 
 # ── Configuration from environment ──────────────────────────────────────────
 GCP_PROJECT        = os.getenv("GOOGLE_CLOUD_PROJECT", "launchwise-ai")
@@ -126,8 +134,22 @@ def health_check():
 
     return health_status
 
+@app.get("/projects")
+def get_user_projects(current_user: database.User = Depends(auth.get_current_user), db: Session = Depends(database.get_db)):
+    projects = db.query(database.Project).filter(database.Project.user_id == current_user.id).order_by(database.Project.created_at.desc()).all()
+    # We return the basic project info + we will set report boolean if status is analyzed
+    result = []
+    for p in projects:
+        result.append({
+            "id": p.id,
+            "name": p.name,
+            "createdAt": p.created_at,
+            "report": p.status == "analyzed"
+        })
+    return result
+
 @app.post("/analyze", response_model=FinalReport)
-def run_orchestration(request: AnalysisRequest):
+def run_orchestration(request: AnalysisRequest, current_user: database.User = Depends(auth.get_current_user), db: Session = Depends(database.get_db)):
     try:
         session_id = str(uuid.uuid4())
         
@@ -138,8 +160,8 @@ def run_orchestration(request: AnalysisRequest):
         # 2. Market Intelligence (Live — Gemini + Google Search grounding with mock fallback)
         market_intel = agents.run_market_analysis(request)
         
-        # 3. Competitor Intelligence (Hardcoded agent)
-        competitor_intel = agents.analyze_competitors(request.business_type)
+        # 3. Competitor Intelligence (Live Gemini agent)
+        competitor_intel = agents.analyze_competitors(request.business_type, request.location)
         
         # 4. Location Intelligence (Hardcoded agent)
         # Prefers exact map-picked coordinates (request.latitude/longitude,
@@ -154,17 +176,17 @@ def run_orchestration(request: AnalysisRequest):
         # 5. Economic Intelligence (Formula-based agent)
         finance_intel = agents.get_finance(request)
         
-        # 6. Customer Persona (Hardcoded agent)
-        personas = agents.get_personas(request.business_type)
+        # 6. Customer Persona (Live Gemini agent)
+        personas = agents.get_personas(request.business_type, request.location)
         
-        # 7. Supply Chain (Hardcoded agent)
-        supply_chain = agents.get_supply_chain(request.business_type)
+        # 7. Supply Chain (Live Gemini agent)
+        supply_chain = agents.get_supply_chain(request.business_type, request.location)
         
-        # 8. Marketing (Hardcoded agent)
-        marketing = agents.get_marketing(request.business_type)
+        # 8. Marketing (Live Gemini agent)
+        marketing = agents.get_marketing(request.business_type, request.location)
         
-        # 9. Risk Prediction (Rule-based agent)
-        risk_intel = agents.evaluate_risk(request.business_type, request.budget, location_intel.competition_density)
+        # 9. Risk Prediction (Live Gemini agent)
+        risk_intel = agents.evaluate_risk(request.business_type, request.budget, location_intel.competition_density, request.location)
 
         # 9.5. Insights Agent (optional — reads BigQuery history for this business_type)
         # Returns None on first-ever analysis of a type, or if BigQuery is unavailable;
@@ -226,6 +248,16 @@ def run_orchestration(request: AnalysisRequest):
         except Exception as be:
             logger.error(f"BigQuery insert failed for session {session_id}: {be}")
 
+        # Save to database to associate project with user
+        new_project = database.Project(
+            id=session_id,
+            name=f"{request.business_type} in {request.location}",
+            user_id=current_user.id,
+            status="analyzed"
+        )
+        db.add(new_project)
+        db.commit()
+
         return report
 
     except Exception as e:
@@ -234,7 +266,12 @@ def run_orchestration(request: AnalysisRequest):
         raise HTTPException(status_code=500, detail=f"Orchestration pipeline failed: {str(e)}")
 
 @app.get("/report/{session_id}", response_model=FinalReport)
-def get_session_report(session_id: str):
+def get_session_report(session_id: str, current_user: database.User = Depends(auth.get_current_user), db: Session = Depends(database.get_db)):
+    # Check if project belongs to the user
+    project = db.query(database.Project).filter(database.Project.id == session_id, database.Project.user_id == current_user.id).first()
+    if not project:
+        raise HTTPException(status_code=403, detail="Not authorized to access this report")
+        
     # Try fetching from local JSON folder first
     save_path = os.path.join(SESSIONS_DIR, f"{session_id}.json")
     if os.path.exists(save_path):
@@ -278,12 +315,16 @@ def get_local_report_file(filename: str):
 
 
 @app.get("/download-report/{session_id}")
-def download_report(session_id: str):
+def download_report(session_id: str, current_user: database.User = Depends(auth.get_current_user), db: Session = Depends(database.get_db)):
     """
     Returns the PDF for a session — redirects to its Cloud Storage public URL
     if one was generated, or regenerates it on the fly from the saved JSON
     report as a last resort (e.g. for sessions created before this endpoint existed).
     """
+    project = db.query(database.Project).filter(database.Project.id == session_id, database.Project.user_id == current_user.id).first()
+    if not project:
+        raise HTTPException(status_code=403, detail="Not authorized to access this report")
+        
     save_path = os.path.join(SESSIONS_DIR, f"{session_id}.json")
     if not os.path.exists(save_path):
         raise HTTPException(status_code=404, detail=f"Report session {session_id} not found.")
@@ -339,7 +380,7 @@ async def upload_business_data(file: UploadFile = File(...)):
 
 
 @app.post("/simulate", response_model=SimulationResult)
-def simulate_scenario(sim: SimulationRequest):
+def simulate_scenario(sim: SimulationRequest, current_user: database.User = Depends(auth.get_current_user), db: Session = Depends(database.get_db)):
     """
     What-If Simulator — recomputes the health score, ROI, risk, break-even,
     and verdict for a modified scenario against an existing session's
@@ -348,6 +389,10 @@ def simulate_scenario(sim: SimulationRequest):
     risk are all deterministic formula-based agents, so this responds
     instantly and can be called on every slider movement in the UI.
     """
+    project = db.query(database.Project).filter(database.Project.id == sim.session_id, database.Project.user_id == current_user.id).first()
+    if not project:
+        raise HTTPException(status_code=403, detail="Not authorized to access this report")
+        
     save_path = os.path.join(SESSIONS_DIR, f"{sim.session_id}.json")
     if not os.path.exists(save_path):
         raise HTTPException(status_code=404, detail=f"Report session {sim.session_id} not found.")
@@ -414,8 +459,12 @@ def simulate_scenario(sim: SimulationRequest):
 
 
 @app.post("/chat", response_model=ChatResponse)
-def chat_with_report(chat: ChatRequest):
+def chat_with_report(chat: ChatRequest, current_user: database.User = Depends(auth.get_current_user), db: Session = Depends(database.get_db)):
     """AI Chat Assistant — answers a question grounded in one session's report."""
+    project = db.query(database.Project).filter(database.Project.id == chat.session_id, database.Project.user_id == current_user.id).first()
+    if not project:
+        raise HTTPException(status_code=403, detail="Not authorized to access this report")
+        
     save_path = os.path.join(SESSIONS_DIR, f"{chat.session_id}.json")
     if not os.path.exists(save_path):
         raise HTTPException(status_code=404, detail=f"Report session {chat.session_id} not found.")
@@ -423,8 +472,20 @@ def chat_with_report(chat: ChatRequest):
     with open(save_path, "r") as f:
         report = json.load(f)
 
-    answer = agents.answer_question(report, chat.question)
+    # Convert list of ChatMessage models to list of dicts for the agent
+    history = [{"role": m.role, "text": m.text} for m in chat.history]
+    answer = agents.answer_question(report, chat.question, history)
     return ChatResponse(answer=answer)
+
+
+@app.post("/consult", response_model=ConsultResponse)
+def consult_with_panel(req: ConsultRequest, current_user: database.User = Depends(auth.get_current_user)):
+    """AI Startup Consultant — panel conversation about a business idea."""
+    # Convert list of Message models to list of dicts for the agent
+    history = [{"role": m.role, "text": m.text} for m in req.messages]
+    result_dict = agents.chat_consultant(history)
+    return ConsultResponse(**result_dict)
+
 
 
 @app.get("/analytics/summary")
@@ -465,13 +526,13 @@ def test_full_pipeline():
 
         biz_profile = agents.analyze_business(test_request)
         market_intel = agents.run_market_analysis(test_request)
-        competitor_intel = agents.analyze_competitors(test_request.business_type)
+        competitor_intel = agents.analyze_competitors(test_request.business_type, test_request.location)
         location_intel = agents.analyze_location(test_request.location, test_request.business_type)
         finance_intel = agents.get_finance(test_request)
-        risk_intel = agents.evaluate_risk(test_request.business_type, test_request.budget, location_intel.competition_density)
-        personas = agents.get_personas(test_request.business_type)
-        supply_chain = agents.get_supply_chain(test_request.business_type)
-        marketing = agents.get_marketing(test_request.business_type)
+        risk_intel = agents.evaluate_risk(test_request.business_type, test_request.budget, location_intel.competition_density, test_request.location)
+        personas = agents.get_personas(test_request.business_type, test_request.location)
+        supply_chain = agents.get_supply_chain(test_request.business_type, test_request.location)
+        marketing = agents.get_marketing(test_request.business_type, test_request.location)
 
         score_breakdown = compute_score_breakdown(market_intel, location_intel, finance_intel, risk_intel, personas, supply_chain, marketing)
         health_score = compute_health_score(score_breakdown)

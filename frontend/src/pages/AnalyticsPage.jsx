@@ -43,7 +43,7 @@ export default function AnalyticsPage() {
           <div className="text-center">
             <p className="text-zinc-500 mb-6 font-medium">Network inactive. No analytics data found.</p>
             <button
-              onClick={() => navigate('/analyze')}
+              onClick={() => navigate('/projects')}
               className="px-6 py-3 rounded-full bg-zinc-100 text-black font-semibold text-sm hover:scale-[1.02] transition-transform"
             >
               Initialize First Scan

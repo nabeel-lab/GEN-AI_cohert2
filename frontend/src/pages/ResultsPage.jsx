@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft, Download, RefreshCw, CheckCircle2, XCircle, AlertTriangle,
@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import {
   AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, ReferenceLine,
+  Tooltip, ResponsiveContainer, ReferenceLine, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar
 } from 'recharts'
 import WhatIfSimulator from '../components/WhatIfSimulator'
 import ChatPanel from '../components/ChatPanel'
@@ -614,6 +614,19 @@ function CompetitorsTab({ report }) {
   const { competitors } = report
   return (
     <div className="flex flex-col gap-6">
+      <div className="surface-card rounded-2xl p-6">
+        <h3 className="font-medium tracking-tight mb-5 text-zinc-100">Competitor Rating Comparison</h3>
+        <ResponsiveContainer width="100%" height={300}>
+          <RadarChart cx="50%" cy="50%" outerRadius="80%" data={competitors.competitors.map(c => ({ subject: c.name, rating: c.rating, fullMark: 5 }))}>
+            <PolarGrid stroke="rgba(255,255,255,0.1)" />
+            <PolarAngleAxis dataKey="subject" tick={{ fill: '#a1a1aa', fontSize: 12 }} />
+            <PolarRadiusAxis angle={30} domain={[0, 5]} tick={{ fill: '#71717a' }} />
+            <Radar name="Rating" dataKey="rating" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.5} />
+            <Tooltip contentStyle={{ backgroundColor: '#18181b', border: '1px solid #3f3f46' }} />
+          </RadarChart>
+        </ResponsiveContainer>
+      </div>
+
       <div className="flex flex-col gap-4">
         {competitors.competitors.map((c) => (
           <div key={c.name} className="surface-card rounded-2xl p-6 transition-all hover:bg-zinc-900/50 hover:border-zinc-700">
@@ -1153,26 +1166,35 @@ const SectionHeader = ({ title, subtitle, icon: Icon }) => (
 // ── Main ResultsPage ─────────────────────────────────────────────────────────
 export default function ResultsPage() {
   const navigate = useNavigate()
+  const { projectId } = useParams()
   const [report, setReport]       = useState(null)
   const [error, setError]         = useState('')
+  const [activeTab, setActiveTab] = useState('overview')
 
   useEffect(() => {
-    const raw = sessionStorage.getItem('lw_report')
-    if (!raw) {
-      setError('No report found. Please run an analysis first.')
-      return
+    const fetchReport = async () => {
+      const token = localStorage.getItem('lw_token')
+      try {
+        const res = await fetch(`http://localhost:8000/report/${projectId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setReport(data)
+        } else {
+          setError('Failed to load report. You may not have access or it does not exist.')
+        }
+      } catch (err) {
+        setError('Error loading report.')
+      }
     }
-    try {
-      setReport(JSON.parse(raw))
-    } catch {
-      setError('Report data is corrupted. Please run a new analysis.')
+    
+    if (projectId) {
+      fetchReport()
+    } else {
+      setError('No project ID provided.')
     }
-  }, [])
-
-  function handleNewAnalysis() {
-    sessionStorage.removeItem('lw_report')
-    navigate('/analyze')
-  }
+  }, [projectId])
 
   if (error) {
     return (
@@ -1181,9 +1203,9 @@ export default function ResultsPage() {
           <AlertCircle size={40} className="text-zinc-500 mx-auto mb-4" />
           <h2 className="text-xl font-medium mb-2 text-zinc-100">No Report Available</h2>
           <p className="text-zinc-500 text-sm mb-6">{error}</p>
-          <button onClick={() => navigate('/analyze')}
+          <button onClick={() => navigate('/projects')}
             className="px-6 py-3 rounded-full bg-zinc-100 text-black font-semibold text-sm hover:scale-[1.02] transition-transform">
-            Run Analysis
+            View Projects
           </button>
         </div>
       </div>
@@ -1200,48 +1222,67 @@ export default function ResultsPage() {
     )
   }
 
+  const tabs = [
+    { id: 'overview', label: 'Executive Overview', component: OverviewTab, icon: Target, subtitle: 'A high-level synthesis of the proposed business idea, integrating market viability, expected financial performance, and operational requirements.' },
+    { id: 'ai-insights', label: 'Agentic Insights', component: AIInsightsTab, icon: Brain, subtitle: 'Deep qualitative analysis extracted by our specialized AI agent network, focusing on hidden market gaps and unexploited competitive advantages.' },
+    { id: 'market', label: 'Market Analysis', component: MarketTab, icon: BarChart3, subtitle: 'Comprehensive evaluation of the Total Addressable Market (TAM), growth trajectories, and prevailing consumer demand signals in the selected location.' },
+    { id: 'competitors', label: 'Competitive Landscape', component: CompetitorsTab, icon: Shield, subtitle: 'Strategic mapping of existing market players, highlighting saturation points, vulnerability metrics, and areas for potential disruption.' },
+    { id: 'finance', label: 'Financial Projections', component: FinanceTab, icon: TrendingUp, subtitle: 'Data-driven 12-month revenue forecasting, break-even analysis, and operational cost breakdown based on local economic indicators.' },
+    { id: 'location', label: 'Location Intelligence', component: LocationTab, icon: MapPin, subtitle: 'Geospatial analysis of foot traffic, accessibility, and local zoning constraints mapped directly to the proposed business coordinates.' },
+    { id: 'personas', label: 'Target Personas', component: PersonasTab, icon: Users, subtitle: 'Synthesized psychographic profiles of the ideal customer base, identifying core needs, pain points, and effective marketing channels.' },
+    { id: 'risk', label: 'Risk Assessment', component: RiskTab, icon: AlertTriangle, subtitle: 'Identification and mitigation strategies for critical business vulnerabilities across supply chain, regulatory, and market domains.' },
+    { id: 'report', label: 'Export & Action Plan', component: ReportTab, icon: Download, subtitle: 'Generate a sharable format of this executive brief for stakeholders, investors, or internal reference.' },
+  ]
+
+  const activeTabData = tabs.find(t => t.id === activeTab) || tabs[0]
+  const ActiveComponent = activeTabData.component
+  const ActiveIcon = activeTabData.icon
+
   return (
-    <div className="min-h-screen bg-background text-zinc-100 font-sans relative">
+    <div className="min-h-screen bg-background text-zinc-100 font-sans flex overflow-hidden">
       <div className="fixed top-0 left-0 w-full h-full bg-glow pointer-events-none z-0" />
       <div className="fixed inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:64px_64px] pointer-events-none z-0" />
 
-
-      {/* ── Internal Floating Navigation ── */}
-      <nav className="hidden xl:flex fixed left-10 top-1/2 -translate-y-1/2 z-40 flex-col gap-1">
-        <div className="text-[10px] font-mono tracking-widest uppercase text-zinc-600 mb-3 px-3">Report Index</div>
-        {[
-          { id: 'overview', label: 'Overview' },
-          { id: 'ai-insights', label: 'AI Insights' },
-          { id: 'market', label: 'Market' },
-          { id: 'competitors', label: 'Competitors' },
-          { id: 'finance', label: 'Finance' },
-          { id: 'location', label: 'Location' },
-          { id: 'personas', label: 'Personas' },
-          { id: 'risk', label: 'Risk' },
-        ].map((sec) => (
-          <a key={sec.id} href={`#${sec.id}`}
-             className="text-[11px] font-medium tracking-wider uppercase text-zinc-500 hover:text-zinc-100 transition-colors py-2 px-3 rounded-lg hover:bg-zinc-800/40">
-            {sec.label}
-          </a>
-        ))}
-      </nav>
-
-      {/* ── Unified Analytical Canvas ── */}
-      <main className="relative z-10 max-w-4xl mx-auto px-8 py-32 flex flex-col gap-16">
+      {/* ── Sidebar ── */}
+      <aside className="relative z-20 w-72 border-r border-zinc-800/50 bg-zinc-900/40 backdrop-blur-xl h-screen flex flex-col pt-24 pb-8">
+        <div className="px-6 mb-8">
+          <h2 className="text-lg font-medium tracking-tight text-zinc-100">Project Analysis</h2>
+          <p className="text-xs text-zinc-500 mt-1 truncate font-mono uppercase tracking-widest">{report.request.business_type}</p>
+        </div>
         
-        {/* Document Header & Executive Brief (Unified Hero) */}
-        <header className="tour-step-analysis flex flex-col gap-10">
+        <nav className="flex-1 px-4 flex flex-col gap-1.5 overflow-y-auto pb-20">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-3 px-4 py-3.5 rounded-xl text-[13px] transition-all text-left ${
+                activeTab === tab.id 
+                  ? 'bg-blue-500/10 text-blue-400 font-medium border border-blue-500/20 shadow-lg shadow-blue-500/5' 
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 border border-transparent'
+              }`}
+            >
+              <tab.icon size={16} className={activeTab === tab.id ? 'text-blue-400' : 'text-zinc-500'} />
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+      </aside>
+
+      {/* ── Main Content Area ── */}
+      <main className="relative z-10 flex-1 h-screen overflow-y-auto pt-24 pb-32 px-10 xl:px-20">
+        
+        <header className="tour-step-analysis flex flex-col gap-10 max-w-5xl mx-auto mb-16">
           <motion.div 
             initial={{ opacity: 0, filter: 'blur(10px)' }}
             animate={{ opacity: 1, filter: 'blur(0px)' }}
             transition={{ duration: 1.5, ease: [0.16, 1, 0.3, 1] }}
-            className="flex items-start gap-6 pt-4"
+            className="flex items-start gap-6"
           >
             <motion.div 
               initial={{ scale: 0, opacity: 0, rotate: -15 }}
               animate={{ scale: 1, opacity: 1, rotate: 0 }}
               transition={{ delay: 2.2, type: 'spring', stiffness: 200, damping: 15 }}
-              className="relative mt-1"
+              className="relative mt-1 flex-shrink-0"
             >
               <div className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full scale-150 animate-pulse" />
               <VerdictIcon verdict={report.decision.go_no_go} />
@@ -1272,88 +1313,13 @@ export default function ResultsPage() {
           </div>
         </header>
 
-        {/* ── Seamless Sections ── */}
-        <div className="flex flex-col gap-40 mt-10">
-          <motion.section id="overview" initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-100px" }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
-            <SectionHeader 
-              title="Executive Overview" 
-              subtitle="A high-level synthesis of the proposed business idea, integrating market viability, expected financial performance, and operational requirements." 
-              icon={Target} 
+        <div className="max-w-5xl mx-auto animate-fade-in-up" key={activeTab}>
+           <SectionHeader 
+              title={activeTabData.label} 
+              subtitle={activeTabData.subtitle} 
+              icon={ActiveIcon} 
             />
-            <OverviewTab report={report} />
-          </motion.section>
-
-          <motion.section id="ai-insights" initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-100px" }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
-            <SectionHeader 
-              title="Agentic Insights" 
-              subtitle="Deep qualitative analysis extracted by our specialized AI agent network, focusing on hidden market gaps and unexploited competitive advantages." 
-              icon={Brain} 
-            />
-            <AIInsightsTab report={report} />
-          </motion.section>
-
-          <motion.section id="market" initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-100px" }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
-            <SectionHeader 
-              title="Market Analysis" 
-              subtitle="Comprehensive evaluation of the Total Addressable Market (TAM), growth trajectories, and prevailing consumer demand signals in the selected location." 
-              icon={BarChart3} 
-            />
-            <MarketTab report={report} />
-          </motion.section>
-
-          <motion.section id="competitors" initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-100px" }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
-            <SectionHeader 
-              title="Competitive Landscape" 
-              subtitle="Strategic mapping of existing market players, highlighting saturation points, vulnerability metrics, and areas for potential disruption." 
-              icon={Shield} 
-            />
-            <CompetitorsTab report={report} />
-          </motion.section>
-
-          <motion.section id="finance" initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-100px" }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
-            <SectionHeader 
-              title="Financial Projections" 
-              subtitle="Data-driven 12-month revenue forecasting, break-even analysis, and operational cost breakdown based on local economic indicators." 
-              icon={TrendingUp} 
-            />
-            <FinanceTab report={report} />
-          </motion.section>
-
-          <motion.section id="location" className="tour-step-maps" initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-100px" }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
-            <SectionHeader 
-              title="Location Intelligence" 
-              subtitle="Geospatial analysis of foot traffic, accessibility, and local zoning constraints mapped directly to the proposed business coordinates." 
-              icon={MapPin} 
-            />
-            <LocationTab report={report} />
-          </motion.section>
-
-          <motion.section id="personas" initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-100px" }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
-            <SectionHeader 
-              title="Target Personas" 
-              subtitle="Synthesized psychographic profiles of the ideal customer base, identifying core needs, pain points, and effective marketing channels." 
-              icon={Users} 
-            />
-            <PersonasTab report={report} />
-          </motion.section>
-
-          <motion.section id="risk" initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-100px" }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
-            <SectionHeader 
-              title="Risk Assessment" 
-              subtitle="Identification and mitigation strategies for critical business vulnerabilities across supply chain, regulatory, and market domains." 
-              icon={AlertTriangle} 
-            />
-            <RiskTab report={report} />
-          </motion.section>
-
-          <motion.section id="report" className="tour-step-reports" initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-100px" }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
-            <SectionHeader 
-              title="Export & Action Plan" 
-              subtitle="Generate a sharable format of this executive brief for stakeholders, investors, or internal reference." 
-              icon={Download} 
-            />
-            <ReportTab report={report} />
-          </motion.section>
+           <ActiveComponent report={report} />
         </div>
       </main>
 
@@ -1366,7 +1332,7 @@ export default function ResultsPage() {
         />
       </div>
       <div className="tour-step-advisor">
-        <ChatPanel sessionId={report.session_id} />
+        <ChatPanel sessionId={report.session_id} projectId={projectId} />
       </div>
     </div>
   )

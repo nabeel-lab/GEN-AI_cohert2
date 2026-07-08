@@ -21,7 +21,7 @@ const AGENTS = [
 
 const AGENT_DELAY_MS = 1800
 
-export default function AgentStatusPanel({ isRunning, onComplete }) {
+export default function AgentStatusPanel({ isRunning, isDataReady, onProceed, onComplete }) {
   const [statuses, setStatuses] = useState(
     () => Object.fromEntries(AGENTS.map((a) => [a.id, 'idle']))
   )
@@ -181,18 +181,32 @@ export default function AgentStatusPanel({ isRunning, onComplete }) {
       </div>
 
       <AnimatePresence>
-        {isRunning && completedCount === AGENTS.length && (
+        {isRunning && completedCount === AGENTS.length && !isDataReady && (
           <motion.div 
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex items-center justify-between px-5 py-4 rounded-xl bg-zinc-100 text-black z-10 mt-2"
+            className="flex items-center justify-between px-5 py-4 rounded-xl bg-zinc-800 text-zinc-400 z-10 mt-2 cursor-not-allowed"
+          >
+            <div className="flex items-center gap-3">
+              <Loader2 size={16} className="text-zinc-400 animate-spin" />
+              <p className="text-sm font-semibold tracking-wide">Finalizing report...</p>
+            </div>
+          </motion.div>
+        )}
+        
+        {isDataReady && (
+          <motion.button 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            onClick={onProceed}
+            className="flex items-center justify-between px-5 py-4 rounded-xl bg-zinc-100 text-black z-10 mt-2 hover:bg-white hover:scale-[1.02] active:scale-100 transition-all cursor-pointer w-full"
           >
             <div className="flex items-center gap-3">
               <CheckCircle2 size={16} className="text-black" />
-              <p className="text-sm font-semibold tracking-wide">Intelligence complete</p>
+              <p className="text-sm font-semibold tracking-wide">Analysis Complete - View Results</p>
             </div>
             <ArrowRight size={16} className="text-black/60" />
-          </motion.div>
+          </motion.button>
         )}
       </AnimatePresence>
     </div>

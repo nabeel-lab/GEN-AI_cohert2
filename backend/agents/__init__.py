@@ -11,3 +11,5 @@ from agents.decision_agent import make_decision
 from agents.analytics_agent import analyze_uploaded_dataset
 from agents.insights_agent import get_historical_context
 from agents.chat_agent import answer_question
+from agents.consult_agent import chat_consultant
+

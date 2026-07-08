@@ -9,7 +9,7 @@ Gemini is unavailable.
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from agents.gemini_helper import call_gemini_json
 
@@ -38,9 +38,17 @@ def _condense_report(report: Dict[str, Any]) -> str:
     """
 
 
-def answer_question(report: Dict[str, Any], question: str) -> str:
-    """Returns a grounded answer to `question` using only `report`'s own data."""
+def answer_question(report: Dict[str, Any], question: str, history: List[Dict[str, str]] = None) -> str:
+    """Returns a grounded answer to `question` using only `report`'s own data, keeping track of history."""
     context = _condense_report(report)
+
+    history_context = ""
+    if history:
+        history_context = "--- CONVERSATION HISTORY ---\n"
+        for msg in history:
+            role_label = "Founder" if msg.get("role") == "user" else "Advisor"
+            history_context += f"{role_label}: {msg.get('text')}\n\n"
+        history_context += "----------------------------\n"
 
     prompt = f"""
     You are LaunchWise AI's business analyst assistant. Answer the founder's question
@@ -49,9 +57,12 @@ def answer_question(report: Dict[str, Any], question: str) -> str:
     and suggest which report tab might help instead. Keep the answer to 2-4 sentences,
     confident and specific, citing the actual figures.
 
+    If there is a conversation history below, refer to it to maintain context of what the founder has asked previously.
+
     --- REPORT DATA ---
     {context}
 
+    {history_context}
     --- QUESTION ---
     {question}
 
