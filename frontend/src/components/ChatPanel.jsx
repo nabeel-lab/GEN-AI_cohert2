@@ -55,7 +55,7 @@ export default function ChatPanel({ sessionId, projectId }) {
 
     try {
       const token = localStorage.getItem('lw_token')
-      const res = await fetch(`http://localhost:8000/chat`, {
+      const res = await fetch(`/api/chat`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

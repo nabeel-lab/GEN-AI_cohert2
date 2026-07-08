@@ -58,6 +58,9 @@ desktop.ini
 
 # ── App generated ─────────────────────────────────────────────────────────────
 *.pdf
+# Exception: pre-generated demo report PDFs are permanent checked-in assets,
+# not runtime output — see frontend/public/demo/.
+!frontend/public/demo/*.pdf
 backend/temp_reports/
 backend/sessions/
 backend/uploads/

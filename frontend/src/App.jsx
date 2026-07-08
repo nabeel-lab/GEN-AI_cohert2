@@ -27,7 +27,10 @@ export default function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/projects" element={<ProtectedRoute><ProjectsPage /></ProtectedRoute>} />
             <Route path="/analyze/:projectId"  element={<ProtectedRoute><AnalysisPage /></ProtectedRoute>} />
-            <Route path="/results/:projectId"  element={<ProtectedRoute><ResultsPage /></ProtectedRoute>} />
+            {/* Not behind ProtectedRoute: demo scenarios (LandingPage) must be
+                viewable without login. Real reports still enforce ownership
+                server-side via the Authorization header when present. */}
+            <Route path="/results/:projectId"  element={<ResultsPage />} />
             <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/consultant" element={<ProtectedRoute><ConsultantPage /></ProtectedRoute>} />
             {/* Catch-all: redirect unknown routes back to home */}

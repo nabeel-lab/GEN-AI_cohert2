@@ -184,7 +184,7 @@ export default function AnalysisPage() {
       }
 
       const token = localStorage.getItem('lw_token')
-      const res = await fetch('http://localhost:8000/analyze', {
+      const res = await fetch('/api/analyze', {
         method:  'POST',
         headers: { 
           'Content-Type': 'application/json',

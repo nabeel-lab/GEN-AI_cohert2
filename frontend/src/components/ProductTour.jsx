@@ -7,7 +7,7 @@ import { DEMO_SCENARIOS } from '../data/demoScenarios'
 // ─────────────────────────────────────────────────────────────────────────────
 // FORCE_TOUR = true  → Always show tour (development mode, ignores localStorage)
 // FORCE_TOUR = false → Normal first-visit logic
-const FORCE_TOUR = true
+const FORCE_TOUR = false
 // ─────────────────────────────────────────────────────────────────────────────
 
 const TOUR_STEPS = [
@@ -134,11 +134,9 @@ export default function ProductTour() {
 
   // ── Start tour ────────────────────────────────────────────────────────────
   useEffect(() => {
-    console.log('[ProductTour] Mounted')
     const seen = localStorage.getItem('lw_has_seen_tour')
     if (FORCE_TOUR || !seen) {
       const t = setTimeout(() => {
-        console.log('[ProductTour] Started')
         setIsOpen(true)
       }, 1200)
       return () => clearTimeout(t)
@@ -159,10 +157,8 @@ export default function ProductTour() {
         findTimerRef.current = setTimeout(() => {
           const r = el.getBoundingClientRect()
           setRect({ x: r.left, y: r.top, w: r.width, h: r.height })
-          console.log(`[ProductTour] Spotlight measured: ${selector}`, r)
         }, 450)
       } else if (tries < 8) {
-        console.log(`[ProductTour] Selector not found: ${selector} (attempt ${tries + 1})`)
         findTimerRef.current = setTimeout(() => attempt(tries + 1), 200)
       } else {
         console.warn(`[ProductTour] Giving up on selector: ${selector}`)
@@ -181,14 +177,11 @@ export default function ProductTour() {
     setRect(null)    // Clear old spotlight instantly
     setReady(false)
 
-    console.log(`[ProductTour] Step ${step + 1}/${TOUR_STEPS.length}: "${config.title}"`)
-
     if (pathname !== config.path) {
       // Need to navigate first — Effect 2 will pick this up
       navigatedRef.current = true
       if (config.path === '/results' && !sessionStorage.getItem('lw_report')) {
         sessionStorage.setItem('lw_report', JSON.stringify(DEMO_SCENARIOS[0].report))
-        console.log('[ProductTour] Injected demo report')
       }
       navigate(config.path)
     } else {
@@ -238,7 +231,6 @@ export default function ProductTour() {
     if (neverShowAgain && !FORCE_TOUR) {
       localStorage.setItem('lw_has_seen_tour', 'true')
     }
-    console.log('[ProductTour] Closed')
   }
 
   // ── SVG Spotlight geometry ────────────────────────────────────────────────

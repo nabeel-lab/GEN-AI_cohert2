@@ -68,7 +68,7 @@ export default function ConsultantPage() {
 
     try {
       const token = localStorage.getItem('lw_token')
-      const res = await fetch('http://localhost:8000/consult', {
+      const res = await fetch('/api/consult', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

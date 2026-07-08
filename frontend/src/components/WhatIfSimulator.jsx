@@ -14,7 +14,7 @@ export default function WhatIfSimulator({ report, onResult }) {
     setLoading(true)
     try {
       const token = localStorage.getItem('lw_token')
-      const res = await fetch(`http://localhost:8000/simulate`, {
+      const res = await fetch(`/api/simulate`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

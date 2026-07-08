@@ -19,7 +19,7 @@ export default function ProjectsPage() {
   const fetchProjects = async () => {
     try {
       const token = localStorage.getItem('lw_token')
-      const res = await fetch('http://localhost:8000/projects', {
+      const res = await fetch('/api/projects', {
         headers: { 'Authorization': `Bearer ${token}` }
       })
       if (res.ok) {

@@ -1,554 +1,296 @@
-# LaunchWise AI - Decision Intelligence Platform
+# LaunchWise AI
 
-**Know before you launch.** 🚀
-
-An AI-powered platform that analyzes business ideas using 10 specialized agents, delivers Go/No-Go verdicts in under 60 seconds, and provides investor-ready reports with dynamic simulations.
+**LaunchWise AI** is an AI-powered decision intelligence platform that evaluates a business idea — a café, a gym, a restaurant, any local venture — and returns an investor-ready Go/No-Go verdict in under a minute. It runs the idea through a pipeline of specialized AI agents that each analyze one dimension of viability (market, competition, location, finance, risk, personas, supply chain, marketing) and synthesizes their output into a single business health score, ROI projection, and downloadable report.
 
 ---
 
-## 🎯 What It Does
+## Problem Statement
 
-LaunchWise AI takes a business idea and runs it through 10 specialized agents:
+Most first-time entrepreneurs decide where and how to launch a business using intuition, a handful of Google searches, and a rough spreadsheet. Professional market research, financial modeling, and competitive analysis are expensive, slow, and usually reserved for later-stage ventures — by the time the founder can afford real diligence, the capital is often already committed. There is no accessible, fast, structured way for someone with an idea to stress-test it before spending money.
 
-1. **Business Intelligence Agent** - Analyzes business model and value proposition
-2. **Market Analysis Agent** - Evaluates market demand and growth potential
-3. **Competitor Intelligence Agent** - Maps competitive landscape with SWOT
-4. **Location Scoring Agent** - Assesses location viability (footfall, competition, growth)
-5. **Financial Forecast Agent** - Projects revenue, costs, ROI, break-even timeline
-6. **Customer Personas Agent** - Identifies target customer segments
-7. **Supply Chain Analysis Agent** - Evaluates sourcing and operational feasibility
-8. **Marketing Strategy Agent** - Plans market entry and acquisition strategy
-9. **Risk Prediction Agent** - Scores operational, market, and financial risks
-10. **Go/No-Go Decision Agent** - Synthesizes all insights into final verdict
+## Solution
 
-**Output:** Investor-ready PDF report, business health score (0-100), confidence score, ROI projection, risk assessment, and a clear recommendation.
+LaunchWise AI compresses that diligence process into a single guided flow. A founder describes their business idea, location, and budget; a network of AI agents analyzes market demand, competitor density, location viability, financial projections, customer personas, supply chain feasibility, marketing strategy, and risk factors in parallel; and the platform returns a synthesized verdict — GO, PROCEED WITH CAUTION, or NO GO — backed by a business health score, an investor-ready PDF report, and an interactive What-If simulator for testing different assumptions.
 
 ---
 
-## 🚀 Quick Start
+## Key Features
+
+- **10-agent AI pipeline** — orchestrated analysis across market, competitor, location, finance, persona, supply chain, marketing, risk, and decision domains
+- **Go/No-Go verdict** with a 0–100 business health score and confidence rating
+- **Investor-ready PDF export** alongside raw JSON export for programmatic use
+- **What-If Simulator** — live re-scoring as budget, marketing spend, competition density, or rent assumptions change
+- **AI Chat Assistant** — grounded Q&A scoped to the generated report (no hallucinated figures)
+- **AI Consultant** — free-form conversational advisory agent for founders
+- **Analytics dashboard** — aggregated metrics across all analyses (decision distribution, top locations, top business types)
+- **Live map integration** — location intelligence rendered on Google Maps
+- **Pre-built demo scenarios** — three fully worked example reports (café, gym, restaurant) for instant exploration with no sign-up required
+- **Continuous-scroll report UI** with sidebar scrollspy navigation
+- **Runs entirely on Gemini's free tier** — no billing account required to demo or develop
+
+---
+
+## Architecture
+
+```
+┌────────────────────────┐        ┌──────────────────────────────┐
+│   React + Vite SPA     │ ─────▶ │        FastAPI Backend        │
+│  (Tailwind, Framer      │  /api  │  10-agent orchestration        │
+│   Motion, Recharts)     │ ◀───── │  Mock-JWT auth · SQLite        │
+└────────────────────────┘        └───────────┬────────────────────┘
+                                               │
+                     ┌─────────────────────────┼─────────────────────────┐
+                     ▼                         ▼                         ▼
+              Google Gemini              Google Maps API         Firestore / BigQuery /
+           (AI Studio, free tier)      (Places, Geocoding)     Cloud Storage (optional,
+                                                                 graceful local fallback)
+```
+
+The frontend never talks to Google Cloud directly — every external call is proxied through the FastAPI backend, which is the only service holding API keys. In local development, Vite proxies `/api/*` to the backend; in production, the same relative-path convention is served through an nginx reverse proxy, so no environment-specific URLs are hardcoded anywhere in the client.
+
+---
+
+## Technology Stack
+
+**Frontend:** React 19, Vite, React Router, Tailwind CSS, Framer Motion, Recharts, Google Maps JavaScript API
+
+**Backend:** FastAPI, Python 3.12, Pydantic, SQLAlchemy + SQLite, ReportLab (PDF generation), Uvicorn
+
+**AI:** Google Gemini (`gemini-2.5-flash` via the `google-genai` SDK, AI Studio API-key auth — free tier, no billing account needed)
+
+**Infrastructure:** Docker, Docker Compose, Kubernetes manifests, Helm chart, Google Cloud Run
+
+---
+
+## Google Cloud Services Used
+
+| Service | Purpose | Required? |
+|---|---|---|
+| **Gemini API (AI Studio)** | Core reasoning engine for all 10 agents | Yes — free tier |
+| **Google Maps JavaScript / Places / Geocoding API** | Location intelligence, map rendering | Optional — graceful skip if unset |
+| **Cloud Firestore** | Persisted report storage | Optional — falls back to local JSON |
+| **BigQuery** | Cross-report analytics aggregation | Optional — falls back to local aggregation |
+| **Cloud Storage** | Hosted PDF report files | Optional — falls back to local file serving |
+| **Cloud Run** | Production hosting for frontend + backend | Deployment target only |
+
+Every optional integration degrades gracefully — the platform is fully functional using only a free-tier `GEMINI_API_KEY`, with no Google Cloud project or billing account required.
+
+---
+
+## AI Agent Pipeline
+
+Each business analysis is broken down and delegated to specialized agents, then synthesized into one verdict:
+
+1. **Business Agent** — business model and value proposition analysis
+2. **Market Agent** — demand signals, growth trajectory, Total Addressable Market
+3. **Competitor Agent** — competitive landscape mapping and saturation analysis
+4. **Location Agent** — footfall, accessibility, and zoning viability
+5. **Finance Agent** — 12-month revenue/cost projection and break-even modeling
+6. **Persona Agent** — target customer segmentation and psychographics
+7. **Supply Chain Agent** — sourcing and operational feasibility
+8. **Marketing Agent** — go-to-market and acquisition strategy
+9. **Risk Agent** — regulatory, market, and operational risk scoring
+10. **Decision Agent** — synthesizes all prior agent outputs into the final Go/No-Go verdict and business health score
+
+Supporting agents handle report Q&A (**Chat Agent**), free-form advisory conversation (**Consult / Conversation Agents**), dataset-driven analytics (**Analytics Agent**), and narrative insight generation (**Insights Agent**).
+
+---
+
+## Project Workflow
+
+1. User submits a business idea (type, location, budget, description) or selects a pre-built demo
+2. The backend orchestrates all 10 agents, each calling Gemini with a domain-specific prompt
+3. Agent outputs are aggregated into a weighted business health score, confidence score, and Go/No-Go verdict
+4. A structured `FinalReport` is persisted (SQLite + optional Firestore) and a PDF is generated
+5. The frontend renders the full report as a continuous scrollable page with sidebar scrollspy navigation
+6. The user can run What-If simulations, ask the AI Chat Assistant questions grounded in the report, or download the PDF/JSON
+
+---
+
+## Installation Guide
 
 ### Prerequisites
-- Python 3.8+
-- Node 16+
-- Optional: Google Cloud credentials for enhanced features
+- Python 3.10+
+- Node.js 18+
+- A free [Google AI Studio](https://aistudio.google.com/app/apikey) API key
 
-### Local Development
+### Clone
 
 ```bash
-# 1. Clone and setup
-git clone <repo>
-cd google\ ai\ model
+git clone https://github.com/nabeel-lab/GEN-AI_cohert2.git
+cd GEN-AI_cohert2
+```
 
-# 2. Backend setup
+### Backend
+
+```bash
 cd backend
+python -m venv venv
+venv\Scripts\activate        # Windows
+# source venv/bin/activate   # macOS/Linux
 pip install -r requirements.txt
-export GEMINI_API_KEY="your-api-key"  # Optional, will use mock fallback
-python -m uvicorn main:app --reload   # Starts on http://localhost:8000
+```
 
-# 3. Frontend setup (new terminal)
+### Frontend
+
+```bash
 cd frontend
 npm install
-npm run dev                             # Starts on http://localhost:5173
 ```
 
-Open http://localhost:5173 in your browser.
+---
 
-### Environment Variables
+## Environment Variables
 
-Create a `.env` file in the project root:
+Copy `.env.example` to `.env` in the project root and fill in your values:
 
 ```bash
-# Gemini API (optional, mock fallback active if not set)
+# Required — free tier, generate at https://aistudio.google.com/app/apikey
 GEMINI_API_KEY=your-gemini-api-key
 
-# Google Cloud (all optional - local fallbacks active)
-GOOGLE_CLOUD_PROJECT=your-gcp-project
-GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
-FIRESTORE_DATABASE=(default)
-STORAGE_BUCKET=your-gcs-bucket
-GOOGLE_MAPS_API_KEY=your-maps-api-key
+# Optional — Google Cloud Project (enables Firestore/BigQuery/Storage)
+PROJECT_ID=your-gcp-project-id
+GOOGLE_CLOUD_PROJECT=your-gcp-project-name
+# GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+
+# Optional
+FIRESTORE_DATABASE=your-firestore-database-id
+GOOGLE_MAPS_API_KEY=your-google-maps-api-key
+STORAGE_BUCKET=your-gcs-bucket-name
+
+# Server (only honored via `python main.py`, not `uvicorn` CLI flags)
+PORT=8000
+HOST=0.0.0.0
 ```
 
-**Note:** LaunchWise works perfectly without GCP credentials. Local fallbacks ensure zero downtime:
-- No Gemini key? Mock responses used
-- No Firestore? JSON sessions stored locally
-- No BigQuery? Analytics aggregated from local JSON
-- No Cloud Storage? PDFs served from local directory
-- No Maps API? Maps embedding skipped
+Every variable besides `GEMINI_API_KEY` is optional — the app runs fully functional with local fallbacks if omitted.
 
 ---
 
-## 📱 Using the Platform
+## Run Locally
 
-### 1. Demo Mode (Instant)
-Click "Try a Pre-Built Demo" on the landing page to see instant analysis of:
-- Specialty Coffee Café (Indiranagar, ₹15L, GO verdict)
-- Premium 24/7 Gym (Whitefield, ₹25L, PROCEED WITH CAUTION)
-- Casual Dining Restaurant (Koramangala, ₹30L, GO verdict)
+```bash
+# Terminal 1 — backend
+cd backend
+venv\Scripts\activate
+uvicorn main:app --reload --port 8000
 
-### 2. Run Your Own Analysis
-1. Click "Analyze My Business Idea"
-2. Fill in: business type, location, budget, description
-3. Click "Run Analysis" (wait ~60 seconds)
-4. Review executive summary and 8 detailed reports
+# Terminal 2 — frontend
+cd frontend
+npm run dev
+```
 
-### 3. What-If Simulator
-On the results page (bottom right):
-- Adjust budget slider (₹5L-₹50L)
-- Change marketing multiplier (0.5x-2.0x)
-- Modify competition density (0-100)
-- Override rent estimate
-- See scores recalculate live
-
-### 4. AI Chat Assistant
-On the results page (bottom left):
-- Ask questions about your analysis
-- Get grounded answers backed by the report
-- No hallucination - only data from your analysis
-
-### 5. Analytics Dashboard
-Click "Analytics" in the top navigation:
-- See aggregated metrics across all analyses
-- Pie chart of GO/CAUTION/NO GO decisions
-- Bar chart of top business types
-- Table of top locations with performance
-
-### 6. Download Report
-On results page:
-- Click "Report" tab
-- Scroll to download PDF
-- Share with investors/stakeholders
+Open `http://localhost:5173`. The Vite dev server proxies `/api/*` requests to the backend on port 8000.
 
 ---
 
-## 🏗️ Architecture
+## Docker
 
-### Backend (FastAPI)
-```
-backend/
-├── main.py                 # FastAPI app, 9 REST endpoints
-├── models.py               # Pydantic schemas for all data
-├── agents/                 # 10 specialized AI agents
-│   ├── gemini_helper.py   # Gemini 1.5 Flash client
-│   ├── business_agent.py  # Business profile analysis
-│   ├── market_agent.py    # Market intelligence
-│   ├── competitor_agent.py # Competitive analysis
-│   ├── location_agent.py  # Location scoring
-│   ├── finance_agent.py   # Financial projections
-│   ├── persona_agent.py   # Customer segmentation
-│   ├── supply_chain_agent.py # Sourcing analysis
-│   ├── marketing_agent.py # Go-to-market strategy
-│   ├── risk_agent.py      # Risk assessment
-│   ├── decision_agent.py  # Final recommendation
-│   ├── chat_agent.py      # Q&A grounding
-│   └── analytics_agent.py # Dataset processing
-├── services/              # GCP integrations
-│   ├── bigquery_service.py
-│   ├── storage_service.py
-│   └── pdf_service.py
-├── sessions/              # Local fallback storage
-└── requirements.txt
-
-**Endpoints:**
-- POST /analyze                  → Run full pipeline
-- POST /simulate                 → What-If Simulator
-- POST /chat                     → AI Chat
-- GET /analytics/summary         → Platform metrics
-- GET /health                    → Service status
-```
-
-### Frontend (React + Vite)
-```
-frontend/
-├── src/
-│   ├── pages/
-│   │   ├── LandingPage.jsx      # Hero, demos, features
-│   │   ├── AnalysisPage.jsx     # Form submission
-│   │   ├── ResultsPage.jsx      # Report display + panels
-│   │   └── AnalyticsPage.jsx    # Platform dashboard
-│   ├── components/
-│   │   ├── ChatPanel.jsx        # AI Assistant (floating)
-│   │   └── WhatIfSimulator.jsx  # Budget sliders (floating)
-│   ├── data/
-│   │   └── demoScenarios.js     # 3 pre-built reports
-│   └── App.jsx                  # Routing
-├── public/
-└── vite.config.js               # Proxy: /api → :8000
-
-**Styling:**
-- Tailwind CSS
-- Dark theme with gold accents
-- Responsive design
-- Smooth animations
-```
-
-### Google Cloud Services
-```
-┌─────────────────────────────────────┐
-│      LaunchWise AI Backend          │
-└────────┬──────────────────┬─────────┘
-         │                  │
-    ┌────▼─────┐      ┌─────▼────┐
-    │  Gemini  │      │ Firestore │
-    │  1.5 Flash    │ (optional) │
-    └──────────┘      └───────────┘
-         │                  │
-         │         ┌────────┴────────┐
-         │         │                 │
-         └────┬────▼──────┬──────────▼──┐
-              │  BigQuery │  Cloud      │
-              │           │  Storage    │
-              │(optional) │ (optional)  │
-              └───────────┴─────────────┘
-
-All services: OPTIONAL with local fallbacks
-```
-
----
-
-## 📦 Deployment
-
-### Docker (Local)
 ```bash
 docker compose up
-# Backend: http://localhost:8000
+# Backend:  http://localhost:8000
 # Frontend: http://localhost:8080
 ```
 
-### Google Cloud Run
+`docker-compose.yml` mirrors the Cloud Run deployment topology (frontend and backend as separate containers) for local integration testing of the built images.
+
+---
+
+## Cloud Run Deployment
+
 ```bash
 # Backend
 gcloud run deploy launchwise-backend \
   --source backend/ \
-  --runtime python311 \
   --port 8000 \
   --allow-unauthenticated \
-  --set-env-vars GEMINI_API_KEY=<key>
+  --set-env-vars GEMINI_API_KEY=<your-key>
 
-# Frontend
+# Frontend (built with the backend's Cloud Run URL injected at build time)
 gcloud run deploy launchwise-frontend \
   --source frontend/ \
   --allow-unauthenticated
 ```
 
-### Kubernetes
-```bash
-kubectl apply -f k8s/
-# Deploys backend (2 replicas) + frontend (2 replicas)
-```
+Kubernetes manifests (`k8s/`) and a Helm chart (`helm/launchwise/`) are also included for cluster-based deployment.
 
-### Helm
-```bash
-helm install launchwise ./helm/launchwise/
+---
+
+## Project Structure
+
+```
+.
+├── backend/
+│   ├── main.py                 # FastAPI app and route definitions
+│   ├── auth.py                 # Mock-JWT auth dependencies
+│   ├── database.py             # SQLAlchemy models (SQLite)
+│   ├── models.py                # Pydantic request/response schemas
+│   ├── agents/                 # 10 core agents + chat/consult/analytics agents
+│   ├── services/                # PDF generation, BigQuery, Cloud Storage integrations
+│   ├── sessions/                # Local fallback report storage
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── pages/               # LandingPage, AnalysisPage, ResultsPage, AnalyticsPage, ConsultantPage, ProjectsPage
+│   │   ├── components/          # ChatPanel, WhatIfSimulator, ProductTour, Navbar
+│   │   ├── context/             # AuthContext (mock-JWT session management)
+│   │   ├── data/                # Pre-built demo scenarios
+│   │   └── App.jsx              # Routing
+│   ├── public/demo/             # Pre-generated demo PDF reports
+│   └── vite.config.js           # Dev proxy: /api → :8000
+├── k8s/                         # Kubernetes manifests
+├── helm/launchwise/              # Helm chart
+├── docker-compose.yml
+└── .env.example
 ```
 
 ---
 
-## 🧪 Testing
+## API Endpoints
 
-### Health Check
-```bash
-curl http://localhost:8000/health | jq
-# Returns service status for each integration
-```
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/health` | Service and integration status |
+| GET | `/auth/me` | Current authenticated user |
+| GET | `/projects` | List a user's saved projects |
+| POST | `/analyze` | Run the full 10-agent analysis pipeline |
+| GET | `/report/{session_id}` | Fetch a completed report |
+| GET | `/report-file/{filename}` | Serve a locally stored report file |
+| GET | `/download-report/{session_id}` | Download the report PDF |
+| POST | `/upload-data` | Upload a dataset for KPI extraction |
+| POST | `/simulate` | Run a What-If scenario against an existing report |
+| POST | `/chat` | Ask the AI Chat Assistant a question grounded in a report |
+| POST | `/consult` | Free-form AI Consultant conversation |
+| GET | `/analytics/summary` | Aggregated platform-wide analytics |
 
-### Try an Analysis
-```bash
-curl -X POST http://localhost:8000/analyze \
-  -H "Content-Type: application/json" \
-  -d '{
-    "business_type": "Coffee Shop",
-    "location": "Bangalore",
-    "budget": 1500000,
-    "description": "Premium specialty coffee targeting tech workers"
-  }' | jq '.decision'
-```
-
-### View Demo
-```bash
-# Open http://localhost:5173
-# Click "Try a Pre-Built Demo"
-```
+All endpoints except `/health` and the demo-report path expect a `Bearer` token in the `Authorization` header (mock-JWT, issued client-side — see [Environment Variables](#environment-variables)).
 
 ---
 
-## 📊 Data Flow
+## Future Scope
 
-```
-User Input
-    ↓
-[Form: Business Type, Location, Budget, Description]
-    ↓
-FastAPI /analyze endpoint
-    ↓
-10-Agent Orchestration (sequential)
-    ├─ Gemini API calls (with mock fallback)
-    ├─ Location scoring (deterministic)
-    ├─ Financial projections (hardcoded model)
-    └─ Risk assessment (rules-based)
-    ↓
-Score Aggregation (8 components, fixed weights)
-    ├─ Market: 20%
-    ├─ Location: 15%
-    ├─ Finance: 15%
-    ├─ Competition: 10%
-    ├─ Risk: 15%
-    ├─ Customer Fit: 10%
-    ├─ Supply Chain: 7.5%
-    └─ Marketing: 7.5%
-    ↓
-Health Score (0-100) + Confidence + Verdict
-    ↓
-Report Generation
-    ├─ JSON (sessionStorage on frontend)
-    ├─ Firestore (if available)
-    └─ BigQuery (if available)
-    ↓
-PDF Creation (ReportLab)
-    └─ Cloud Storage or local serving
-    ↓
-Response to Frontend
-    ├─ Display in Results page
-    ├─ Enable What-If Simulator
-    └─ Enable Chat Assistant
-    ↓
-Analytics Aggregation
-    └─ BigQuery or local JSON aggregation
-    ↓
-Dashboard Display
-    └─ KPIs, charts, location table
-```
+- Real OAuth/identity provider integration in place of the current mock-JWT scheme
+- Persisted multi-user collaboration on a single project/report
+- Expanded agent set (e.g. legal/regulatory compliance, hiring plan generation)
+- Historical trend tracking for re-analyzed businesses over time
+- Native mobile app wrapping the existing report experience
+
+## Known Limitations
+
+- Authentication is a client-side mock-JWT scheme, not a production identity provider — suitable for demo/hackathon use, not for handling real user credentials
+- Firestore, BigQuery, and Cloud Storage integrations are optional and fall back to local storage; multi-instance deployments without these configured will not share state across instances
+- Financial and scoring models use fixed weightings rather than a trained predictive model
+- Google Maps features are skipped entirely if `GOOGLE_MAPS_API_KEY` is not configured
 
 ---
 
-## 🔒 Security & Privacy
+## Contributors
 
-- ✅ No data persisted without consent (local-first by default)
-- ✅ Optional: Cloud storage for backups
-- ✅ Input validation via Pydantic
-- ✅ Graceful error handling (no sensitive data in errors)
-- ✅ CORS configured for frontend/backend isolation
-- ✅ Environment variables for secrets (no hardcoding)
+- Saad Riyaz Mohammed ([@saad-46](https://github.com/saad-46))
+- Nabeel
 
 ---
 
-## 🛠️ Troubleshooting
-
-### "Module not found" errors
-```bash
-# Backend
-cd backend && pip install -r requirements.txt
-
-# Frontend
-cd frontend && npm install
-```
-
-### Port already in use
-```bash
-# Kill existing process
-lsof -i :8000    # Find process on 8000
-kill -9 <PID>    # Kill it
-
-# Or use different port
-python -m uvicorn main:app --port 9000
-```
-
-### Gemini API errors
-LaunchWise handles this gracefully:
-- If key is invalid/missing: Mock responses used
-- If quota exceeded: Mock fallback
-- Check: `curl http://localhost:8000/health | jq '.services.gemini'`
-
-### Analytics showing no data
-- Ensure analyses have been completed (saved to `backend/sessions/`)
-- Check: `ls backend/sessions/ | wc -l` (should show session files)
-- Try: Run a demo or new analysis to generate data
-
-### Maps not showing
-- Optional feature, doesn't break functionality
-- Set `GOOGLE_MAPS_API_KEY` in `.env` to enable
-- Check: Results page loads even without Maps API
+Built by Saad and Nabeel.
 
 ---
-
-## 📚 API Reference
-
-### POST /analyze
-**Analyze a business idea**
-
-```json
-Request:
-{
-  "business_type": "Coffee Shop",
-  "location": "Indiranagar, Bangalore",
-  "budget": 1500000,
-  "description": "Premium specialty coffee targeting remote workers"
-}
-
-Response:
-{
-  "session_id": "uuid-here",
-  "business_profile": {...},
-  "market_research": {...},
-  "competitors": {...},
-  "location_research": {...},
-  "financial_outlook": {...},
-  "risk_assessment": {...},
-  "customer_personas": [...],
-  "supply_chain_analysis": [...],
-  "marketing_strategy": [...],
-  "decision": {
-    "go_no_go": "GO",
-    "business_health_score": 72,
-    "confidence_score": 78,
-    "confidence_factors": [...]
-  },
-  "pdf_url": "http://...",
-  "json_url": "http://..."
-}
-```
-
-### POST /simulate
-**Run what-if scenario**
-
-```json
-Request:
-{
-  "session_id": "uuid-here",
-  "budget": 2000000,
-  "marketing_multiplier": 1.5,
-  "competition_density": 45,
-  "rent_override": 50000
-}
-
-Response:
-{
-  "business_health_score": 68,
-  "confidence_score": 72,
-  "go_no_go": "PROCEED WITH CAUTION",
-  "risk_score": 55,
-  "risk_level": "Medium",
-  "roi_percentage": 18.5,
-  "break_even_months": 10,
-  "score_breakdown": {
-    "market": 78,
-    "location": 82,
-    "finance": 42,
-    ...
-  }
-}
-```
-
-### POST /chat
-**Ask AI assistant**
-
-```json
-Request:
-{
-  "session_id": "uuid-here",
-  "question": "What are the biggest risks for this business?"
-}
-
-Response:
-{
-  "answer": "Based on your analysis, the biggest risks are..."
-}
-```
-
-### GET /analytics/summary
-**Platform aggregation**
-
-```json
-Response:
-{
-  "source": "local_json | bigquery",
-  "total_reports": 13,
-  "avg_health_score": 61.4,
-  "avg_roi": -64.1,
-  "avg_risk_score": 52.5,
-  "decision_distribution": {
-    "GO": 3,
-    "PROCEED WITH CAUTION": 8,
-    "NO GO": 2
-  },
-  "by_business_type": [...],
-  "by_location": [...]
-}
-```
-
-### GET /health
-**Service status**
-
-```json
-Response:
-{
-  "status": "healthy",
-  "timestamp": "2026-07-06T...",
-  "services": {
-    "gemini": "connected",
-    "firestore": "disconnected (JSON fallback active)",
-    "bigquery": "disconnected (local aggregation)",
-    "storage": "disconnected (local serving)",
-    "maps": "configured"
-  },
-  "fallbacks": {
-    "sessions_dir": true,
-    "uploads_dir": true
-  }
-}
-```
-
----
-
-## 🎓 Learning Resources
-
-- [Pydantic Documentation](https://docs.pydantic.dev/)
-- [FastAPI Guide](https://fastapi.tiangolo.com/)
-- [Google Generative AI Python SDK](https://ai.google.dev/tutorials/python_quickstart)
-- [BigQuery Documentation](https://cloud.google.com/bigquery/docs)
-- [React Hooks Documentation](https://react.dev/reference/react)
-- [Tailwind CSS Docs](https://tailwindcss.com/docs)
-
----
-
-## 📝 License
-
-MIT License - see LICENSE file for details
-
----
-
-## 🤝 Contributing
-
-Contributions welcome! The codebase is structured for easy extension:
-
-### Adding a New Agent
-1. Create `backend/agents/new_agent.py`
-2. Implement function returning appropriate model
-3. Export in `backend/agents/__init__.py`
-4. Integrate in `main.py` orchestration
-5. Add tests
-
-### Adding a New GCP Service
-1. Create `backend/services/new_service.py`
-2. Implement with graceful fallback
-3. Export in `backend/services/__init__.py`
-4. Integrate in main.py where needed
-
-### Frontend Components
-1. Create in `frontend/src/components/`
-2. Use existing styling (Tailwind + dark theme)
-3. Follow React hooks patterns
-4. Test responsiveness
-
----
-
-## 🚀 Deployment Checklist
-
-See [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md) for production readiness verification and deployment instructions.
-
----
-
-**Built with:** Python, FastAPI, React, Tailwind, Gemini 1.5 Flash, Google Cloud
-
-
-

@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import {
   ArrowLeft, Download, RefreshCw, CheckCircle2, XCircle, AlertTriangle,
   TrendingUp, TrendingDown, Minus, MapPin, Users, Shield, BarChart3,
   Truck, Megaphone, UserCheck, Brain, Star, AlertCircle, Sparkles,
   Target, Lightbulb, Flag, Compass, Gauge, ExternalLink, Loader2,
+  FileText, Package, Menu, X,
 } from 'lucide-react'
 import {
   AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid,
@@ -15,7 +16,23 @@ import WhatIfSimulator from '../components/WhatIfSimulator'
 import ChatPanel from '../components/ChatPanel'
 import { loadGoogleMaps, DARK_MAP_STYLE } from '../lib/googleMaps'
 
+// Pre-generated PDFs for the built-in demo scenarios (frontend/public/demo/),
+// produced offline by the same backend pdf_service.py used for real reports.
+// Keyed by report.session_id (fixed per demoScenarios.js) — not string
+// matching against the URL — so detection can't drift if routing changes.
+const DEMO_PDF_BY_SESSION_ID = {
+  'demo-cafe-001': '/demo/demo-cafe.pdf',
+  'demo-gym-001': '/demo/demo-gym.pdf',
+  'demo-restaurant-001': '/demo/demo-restaurant.pdf',
+}
 
+// Fixed section order for the scrollspy observer — mirrors the `tabs` array
+// defined inside ResultsPage, kept here so the IntersectionObserver effect
+// (a hook, must run unconditionally) doesn't depend on `report` being loaded.
+const REPORT_SECTION_IDS = [
+  'overview', 'ai-insights', 'market', 'competitors',
+  'finance', 'location', 'personas', 'risk', 'report',
+]
 
 // ── Small reusable primitives ────────────────────────────────────────────────
 
@@ -1063,7 +1080,9 @@ function RiskTab({ report }) {
 
 // ── Tab: Report (export) ─────────────────────────────────────────────────────
 function ReportTab({ report }) {
-  function handleDownload() {
+  const [pdfState, setPdfState] = useState('idle') // idle | loading | error
+
+  function handleDownloadJson() {
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
@@ -1073,21 +1092,73 @@ function ReportTab({ report }) {
     URL.revokeObjectURL(url)
   }
 
+  async function handleDownloadPdf() {
+    // Cloud Storage / local-fallback PDF URL is already on the report for
+    // any completed backend analysis — use it directly.
+    if (report.pdf_url) { window.open(report.pdf_url, '_blank'); return }
+
+    // Built-in demo scenarios have no backend session at all — their PDFs
+    // are pre-generated (via the same pdf_service.py used for real reports)
+    // and shipped as static assets, so they open instantly with no API call.
+    const demoPdf = DEMO_PDF_BY_SESSION_ID[report.session_id]
+    if (demoPdf) { window.open(demoPdf, '_blank'); return }
+
+    // No pdf_url and not a known demo — try the on-demand generation
+    // endpoint for real orphaned sessions; fail gracefully rather than a
+    // broken navigation.
+    setPdfState('loading')
+    try {
+      const token = localStorage.getItem('lw_token')
+      const res = await fetch(`/api/download-report/${report.session_id}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+      if (res.redirected || res.ok) { window.open(res.url, '_blank'); setPdfState('idle') }
+      else { setPdfState('error') }
+    } catch (e) {
+      setPdfState('error')
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="surface-card rounded-2xl p-10 text-center border-t border-t-zinc-700/50">
-        <div className="w-16 h-16 mx-auto bg-zinc-900 border border-zinc-700 rounded-2xl flex items-center justify-center mb-6 shadow-xl">
-          <Download size={24} className="text-zinc-300" />
+      <div className="grid sm:grid-cols-5 gap-6">
+        {/* PDF — visually emphasized as the primary export */}
+        <div className="sm:col-span-3 surface-card rounded-2xl p-10 text-center border-t-2 border-t-blue-500/60 bg-blue-500/[0.03]">
+          <div className="w-16 h-16 mx-auto bg-blue-500/10 border border-blue-500/20 rounded-2xl flex items-center justify-center mb-6 shadow-xl">
+            <FileText size={24} className="text-blue-400" />
+          </div>
+          <h2 className="text-2xl font-medium tracking-tight mb-3 text-zinc-100">Download PDF Report</h2>
+          <p className="text-zinc-400 text-sm mb-8 max-w-md mx-auto font-light leading-relaxed">
+            The investor-ready report — executive summary, charts, business health,
+            Go/No-Go verdict, and AI insights, formatted for sharing.
+          </p>
+          <button onClick={handleDownloadPdf} disabled={pdfState === 'loading'}
+            className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-blue-500 text-white font-semibold text-[15px] hover:bg-blue-600 hover:scale-[1.02] active:scale-100 transition-all disabled:opacity-60 disabled:hover:scale-100">
+            {pdfState === 'loading'
+              ? <><Loader2 size={18} className="animate-spin" /> Preparing PDF…</>
+              : <><Download size={18} /> Download PDF</>}
+          </button>
+          {pdfState === 'error' && (
+            <p className="text-amber-400/80 text-xs mt-4 flex items-center justify-center gap-1.5">
+              <AlertCircle size={13} /> Couldn't prepare the PDF for this report — use the JSON export instead.
+            </p>
+          )}
         </div>
-        <h2 className="text-2xl font-medium tracking-tight mb-3 text-zinc-100">Full Intelligence Report</h2>
-        <p className="text-zinc-400 text-sm mb-8 max-w-md mx-auto font-light leading-relaxed">
-          Download the complete JSON report with all 10 agent outputs, financial forecasts,
-          and the Go/No-Go decision — ready to share with co-founders or investors.
-        </p>
-        <button onClick={handleDownload}
-          className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-zinc-100 text-black font-semibold text-[15px] hover:bg-white hover:scale-[1.02] active:scale-100 transition-all">
-          <Download size={18} /> Download Report JSON
-        </button>
+
+        {/* JSON — secondary export */}
+        <div className="sm:col-span-2 surface-card rounded-2xl p-10 text-center border-t border-t-zinc-700/50">
+          <div className="w-16 h-16 mx-auto bg-zinc-900 border border-zinc-700 rounded-2xl flex items-center justify-center mb-6 shadow-xl">
+            <Package size={24} className="text-zinc-300" />
+          </div>
+          <h3 className="text-lg font-medium tracking-tight mb-3 text-zinc-100">Download JSON Report</h3>
+          <p className="text-zinc-500 text-xs mb-8 max-w-xs mx-auto font-light leading-relaxed">
+            The raw structured analysis — all 10 agent outputs, ready for programmatic use.
+          </p>
+          <button onClick={handleDownloadJson}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-zinc-100 text-black font-semibold text-sm hover:bg-white hover:scale-[1.02] active:scale-100 transition-all">
+            <Download size={16} /> Download JSON
+          </button>
+        </div>
       </div>
 
       <div className="surface-card rounded-2xl p-6">
@@ -1170,12 +1241,30 @@ export default function ResultsPage() {
   const [report, setReport]       = useState(null)
   const [error, setError]         = useState('')
   const [activeTab, setActiveTab] = useState('overview')
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const mainRef = useRef(null)
+  const sectionRefs = useRef({})
+  const clickScrollLock = useRef(false)
+  const prefersReducedMotion = useReducedMotion()
 
   useEffect(() => {
     const fetchReport = async () => {
+      // Demo scenarios (and any project with a client-cached report) are
+      // seeded into localStorage by LandingPage/AnalysisPage and never exist
+      // as a real backend session — check there first so demos work with no
+      // login, no prior project, and no Firestore/DB row required.
+      try {
+        const stored = localStorage.getItem('lw_projects')
+        if (stored) {
+          const projects = JSON.parse(stored)
+          const local = projects.find(p => p.id === projectId && p.report)
+          if (local) { setReport(local.report); return }
+        }
+      } catch (e) {}
+
       const token = localStorage.getItem('lw_token')
       try {
-        const res = await fetch(`http://localhost:8000/report/${projectId}`, {
+        const res = await fetch(`/api/report/${projectId}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         })
         if (res.ok) {
@@ -1188,13 +1277,53 @@ export default function ResultsPage() {
         setError('Error loading report.')
       }
     }
-    
+
     if (projectId) {
       fetchReport()
     } else {
       setError('No project ID provided.')
     }
   }, [projectId])
+
+  // Scrollspy: keep the sidebar's active item in sync with whichever section
+  // is nearest the top of the scroll container. One observer for the page's
+  // lifetime — no per-scroll-event listeners.
+  useEffect(() => {
+    if (!report) return
+    const root = mainRef.current
+    if (!root) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (clickScrollLock.current) return
+        const visible = entries.filter((e) => e.isIntersecting)
+        if (visible.length === 0) return
+        const topMost = visible.reduce((a, b) =>
+          a.boundingClientRect.top <= b.boundingClientRect.top ? a : b
+        )
+        const id = topMost.target.getAttribute('data-section-id')
+        if (id) setActiveTab(id)
+      },
+      { root, rootMargin: '-15% 0px -75% 0px', threshold: 0 }
+    )
+
+    REPORT_SECTION_IDS.forEach((id) => {
+      const el = sectionRefs.current[id]
+      if (el) observer.observe(el)
+    })
+
+    return () => observer.disconnect()
+  }, [report])
+
+  const scrollToSection = useCallback((id) => {
+    const el = sectionRefs.current[id]
+    if (!el) return
+    clickScrollLock.current = true
+    setActiveTab(id)
+    setMobileNavOpen(false)
+    el.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' })
+    window.setTimeout(() => { clickScrollLock.current = false }, prefersReducedMotion ? 50 : 800)
+  }, [prefersReducedMotion])
 
   if (error) {
     return (
@@ -1234,43 +1363,79 @@ export default function ResultsPage() {
     { id: 'report', label: 'Export & Action Plan', component: ReportTab, icon: Download, subtitle: 'Generate a sharable format of this executive brief for stakeholders, investors, or internal reference.' },
   ]
 
-  const activeTabData = tabs.find(t => t.id === activeTab) || tabs[0]
-  const ActiveComponent = activeTabData.component
-  const ActiveIcon = activeTabData.icon
+  const sidebarNav = (
+    <nav aria-label="Report sections" className="flex-1 px-4 flex flex-col gap-1.5 overflow-y-auto pb-20">
+      {tabs.map((tab) => (
+        <button
+          key={tab.id}
+          onClick={() => scrollToSection(tab.id)}
+          aria-current={activeTab === tab.id ? 'true' : undefined}
+          className={`flex items-center gap-3 px-4 py-3.5 rounded-xl text-[13px] transition-all duration-300 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 ${
+            activeTab === tab.id
+              ? 'bg-blue-500/10 text-blue-400 font-medium border border-blue-500/20 shadow-lg shadow-blue-500/5'
+              : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 border border-transparent'
+          }`}
+        >
+          <tab.icon size={16} className={activeTab === tab.id ? 'text-blue-400' : 'text-zinc-500'} />
+          {tab.label}
+        </button>
+      ))}
+    </nav>
+  )
 
   return (
     <div className="min-h-screen bg-background text-zinc-100 font-sans flex overflow-hidden">
       <div className="fixed top-0 left-0 w-full h-full bg-glow pointer-events-none z-0" />
       <div className="fixed inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:64px_64px] pointer-events-none z-0" />
 
-      {/* ── Sidebar ── */}
-      <aside className="relative z-20 w-72 border-r border-zinc-800/50 bg-zinc-900/40 backdrop-blur-xl h-screen flex flex-col pt-24 pb-8">
+      {/* ── Sidebar (desktop: persistent; mobile: slide-over drawer) ── */}
+      <aside className="hidden lg:flex relative z-20 w-72 border-r border-zinc-800/50 bg-zinc-900/40 backdrop-blur-xl h-screen flex-col pt-24 pb-8">
         <div className="px-6 mb-8">
           <h2 className="text-lg font-medium tracking-tight text-zinc-100">Project Analysis</h2>
           <p className="text-xs text-zinc-500 mt-1 truncate font-mono uppercase tracking-widest">{report.request.business_type}</p>
         </div>
-        
-        <nav className="flex-1 px-4 flex flex-col gap-1.5 overflow-y-auto pb-20">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-3 px-4 py-3.5 rounded-xl text-[13px] transition-all text-left ${
-                activeTab === tab.id 
-                  ? 'bg-blue-500/10 text-blue-400 font-medium border border-blue-500/20 shadow-lg shadow-blue-500/5' 
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 border border-transparent'
-              }`}
-            >
-              <tab.icon size={16} className={activeTab === tab.id ? 'text-blue-400' : 'text-zinc-500'} />
-              {tab.label}
-            </button>
-          ))}
-        </nav>
+        {sidebarNav}
       </aside>
 
+      <button
+        onClick={() => setMobileNavOpen(true)}
+        aria-label="Open report navigation"
+        className="lg:hidden fixed z-30 top-24 left-4 w-11 h-11 rounded-xl bg-zinc-900/80 border border-zinc-800/50 backdrop-blur-xl flex items-center justify-center text-zinc-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+      >
+        <Menu size={18} />
+      </button>
+
+      <AnimatePresence>
+        {mobileNavOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setMobileNavOpen(false)}
+              className="lg:hidden fixed inset-0 z-30 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.aside
+              initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }}
+              transition={{ duration: prefersReducedMotion ? 0 : 0.35, ease: [0.16, 1, 0.3, 1] }}
+              className="lg:hidden fixed z-40 top-0 left-0 w-72 h-screen bg-zinc-900/95 border-r border-zinc-800/50 backdrop-blur-xl flex flex-col pt-8 pb-8"
+            >
+              <div className="px-6 mb-8 flex items-start justify-between">
+                <div>
+                  <h2 className="text-lg font-medium tracking-tight text-zinc-100">Project Analysis</h2>
+                  <p className="text-xs text-zinc-500 mt-1 truncate font-mono uppercase tracking-widest">{report.request.business_type}</p>
+                </div>
+                <button onClick={() => setMobileNavOpen(false)} aria-label="Close report navigation" className="text-zinc-500 hover:text-zinc-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 rounded-lg p-1">
+                  <X size={18} />
+                </button>
+              </div>
+              {sidebarNav}
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* ── Main Content Area ── */}
-      <main className="relative z-10 flex-1 h-screen overflow-y-auto pt-24 pb-32 px-10 xl:px-20">
-        
+      <main ref={mainRef} className="relative z-10 flex-1 h-screen overflow-y-auto pt-24 pb-32 px-6 sm:px-10 xl:px-20">
+
         <header className="tour-step-analysis flex flex-col gap-10 max-w-5xl mx-auto mb-16">
           <motion.div 
             initial={{ opacity: 0, filter: 'blur(10px)' }}
@@ -1313,22 +1478,38 @@ export default function ResultsPage() {
           </div>
         </header>
 
-        <div className="max-w-5xl mx-auto animate-fade-in-up" key={activeTab}>
-           <SectionHeader 
-              title={activeTabData.label} 
-              subtitle={activeTabData.subtitle} 
-              icon={ActiveIcon} 
-            />
-           <ActiveComponent report={report} />
+        <div className="max-w-5xl mx-auto">
+          {tabs.map((tab) => {
+            const TabComponent = tab.component
+            return (
+              <motion.section
+                key={tab.id}
+                id={tab.id}
+                ref={(el) => { sectionRefs.current[tab.id] = el }}
+                data-section-id={tab.id}
+                aria-label={tab.label}
+                initial={prefersReducedMotion ? false : { opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-80px' }}
+                transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                className="scroll-mt-24"
+              >
+                <SectionHeader
+                  title={tab.label}
+                  subtitle={tab.subtitle}
+                  icon={tab.icon}
+                />
+                <TabComponent report={report} />
+              </motion.section>
+            )
+          })}
         </div>
       </main>
 
       <div className="tour-step-engine">
         <WhatIfSimulator
           report={report}
-          onResult={(result) => {
-            console.log('Simulation result:', result)
-          }}
+          onResult={() => {}}
         />
       </div>
       <div className="tour-step-advisor">
