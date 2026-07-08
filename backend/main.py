@@ -151,7 +151,8 @@ def get_user_projects(current_user: database.User = Depends(auth.get_current_use
 @app.post("/analyze", response_model=FinalReport)
 def run_orchestration(request: AnalysisRequest, current_user: database.User = Depends(auth.get_current_user), db: Session = Depends(database.get_db)):
     try:
-        session_id = str(uuid.uuid4())
+        session_id = request.session_id if request.session_id else str(uuid.uuid4())
+
         
         # --- Sequential Orchestration of 10 Agents ---
         # 1. Business Understanding (Live — Gemini with mock fallback)

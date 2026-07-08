@@ -8,64 +8,74 @@ export function AuthProvider({ children }) {
 
     useEffect(() => {
         const token = localStorage.getItem('lw_token');
-        if (token) {
-            fetchUser(token);
-        } else {
-            setLoading(false);
+        if (token && token.startsWith('mockjwt.')) {
+            try {
+                const parts = token.split('.');
+                const payloadB64 = parts[1];
+                const payloadJson = atob(payloadB64);
+                const payload = JSON.parse(payloadJson);
+                setUser({
+                    id: payload.sub,
+                    email: payload.email
+                });
+            } catch (err) {
+                console.error('Error decoding stored mock token:', err);
+                localStorage.removeItem('lw_token');
+            }
         }
+        setLoading(false);
     }, []);
 
-    const fetchUser = async (token) => {
-        try {
-            const response = await fetch('http://localhost:8000/auth/me', {
-                headers: {
-                    'Authorization': `Bearer ${token}`
+    // Setup global fetch interceptor to automatically append the Auth JWT
+    useEffect(() => {
+        const originalFetch = window.fetch;
+        window.fetch = async (input, init) => {
+            const url = typeof input === 'string' ? input : input.url;
+            if (url.includes('localhost:8000') || url.startsWith('/')) {
+                const token = localStorage.getItem('lw_token');
+                if (token) {
+                    init = init || {};
+                    init.headers = init.headers || {};
+                    if (init.headers instanceof Headers) {
+                        init.headers.set('Authorization', `Bearer ${token}`);
+                    } else if (Array.isArray(init.headers)) {
+                        const authIdx = init.headers.findIndex(([k]) => k.toLowerCase() === 'authorization');
+                        if (authIdx !== -1) {
+                            init.headers[authIdx] = ['Authorization', `Bearer ${token}`];
+                        } else {
+                            init.headers.push(['Authorization', `Bearer ${token}`]);
+                        }
+                    } else {
+                        init.headers['Authorization'] = `Bearer ${token}`;
+                    }
                 }
-            });
-            if (response.ok) {
-                const userData = await response.json();
-                setUser(userData);
-            } else {
-                localStorage.removeItem('lw_token');
-                setUser(null);
             }
-        } catch (error) {
-            console.error('Failed to fetch user:', error);
-            localStorage.removeItem('lw_token');
-            setUser(null);
-        } finally {
-            setLoading(false);
-        }
-    };
+            return originalFetch(input, init);
+        };
 
-    const login = async (email, password) => {
-        const formData = new FormData();
-        formData.append('username', email);
-        formData.append('password', password);
+        return () => {
+            window.fetch = originalFetch;
+        };
+    }, []);
 
-        const response = await fetch('http://localhost:8000/auth/token', {
-            method: 'POST',
-            body: formData,
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            localStorage.setItem('lw_token', data.access_token);
-            await fetchUser(data.access_token);
+    const loginWithMockGoogle = async (email) => {
+        try {
+            // Generate standard-looking mock JWT
+            const safeId = "google_mock_" + btoa(email).replace(/=/g, "").toLowerCase();
+            const payload = {
+                sub: safeId,
+                email: email
+            };
+            const payloadB64 = btoa(JSON.stringify(payload));
+            const mockToken = `mockjwt.${payloadB64}.signature`;
+            
+            localStorage.setItem('lw_token', mockToken);
+            setUser({ id: safeId, email: email });
             return true;
+        } catch (err) {
+            console.error('Mock login error:', err);
+            return false;
         }
-        return false;
-    };
-
-    const register = async (email, password) => {
-        const response = await fetch('http://localhost:8000/auth/register', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ email, password })
-        });
-        return response.ok;
     };
 
     const logout = () => {
@@ -73,11 +83,17 @@ export function AuthProvider({ children }) {
         setUser(null);
     };
 
+    const login = async () => true;
+    const register = async () => true;
+
     return (
-        <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+        <AuthContext.Provider value={{ user, loading, login, register, logout, loginWithMockGoogle }}>
             {children}
         </AuthContext.Provider>
     );
 }
 
 export const useAuth = () => useContext(AuthContext);
+
+
+

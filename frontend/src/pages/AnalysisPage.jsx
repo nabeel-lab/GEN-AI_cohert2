@@ -164,10 +164,12 @@ export default function AnalysisPage() {
     try {
       const loc = data.location_data
       const payload = {
+        session_id:    projectId || undefined,
         business_type: data.business_type,
         location:      data.location,
         budget:        parseFloat(data.budget),
         description:   data.description,
+
         ...(loc && loc.latitude != null ? {
           latitude:          loc.latitude,
           longitude:         loc.longitude,

@@ -3,10 +3,12 @@ from typing import List, Dict, Any, Optional
 
 # --- Input Models ---
 class AnalysisRequest(BaseModel):
+    session_id: Optional[str] = Field(None, description="Optional pre-generated session/project ID")
     business_type: str = Field(..., description="Type of business (e.g. cafe, bakery, restaurant, retail, gym, salon)")
     location: str = Field(..., description="Target city/neighborhood (e.g. Indiranagar, Bangalore)")
     budget: float = Field(..., description="Budget in INR")
     description: str = Field(..., description="Detailed description of the business idea")
+
 
     # --- Precise location (optional) ---
     # Populated by the frontend's Uber-style map picker (Maps JavaScript API +
